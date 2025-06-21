@@ -12,7 +12,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 class HiButtonView(discord.ui.View):
     @discord.ui.button(label="Say hi too", style=discord.ButtonStyle.primary)
     async def say_hi(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("hi too", ephemeral=True)
+        await interaction.response.send_message("hi too", ephemeral=False)
 
 @bot.event
 async def on_ready():
@@ -21,7 +21,7 @@ async def on_ready():
 
 @bot.tree.command(name="hi", description="Say hi")
 async def hi_command(interaction: discord.Interaction):
-    await interaction.response.send_message("Hey there! 👋 Click the button:", view=HiButtonView(), ephemeral=True)
+    await interaction.response.send_message("Hey there daddy::", view=HiButtonView(), ephemeral=True)
 
 token = os.getenv("TOKEN")
 if not token:
