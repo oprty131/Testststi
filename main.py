@@ -19,9 +19,9 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
-@bot.tree.command(name="Test", description="test rai")
+@bot.tree.command(name="hi", description="Say hi")
 async def hi_command(interaction: discord.Interaction):
-    await interaction.response.send_message("Hey Test:", view=HiButtonView(), ephemeral=True)
+    await interaction.response.send_message("Hey there! 👋 Click the button:", view=HiButtonView(), ephemeral=True)
 
 token = os.getenv("TOKEN")
 if not token:
