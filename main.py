@@ -1,29 +1,34 @@
-import os
 import discord
+import os
 from discord.ext import commands
+from discord import app_commands
 from dotenv import load_dotenv
 
-load_dotenv()  # Loads environment variables from a .env file
-
-TOKEN = os.getenv('TOKEN')
+load_dotenv()
 
 intents = discord.Intents.default()
-intents.message_content = True  # Needed to read message content
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+class HiButtonView(discord.ui.View):
+    @discord.ui.button(label="Say hi too", style=discord.ButtonStyle.primary)
+    async def say_hi(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("hi too", ephemeral=False)
 
 @bot.event
 async def on_ready():
-    print(f'🤖 Logged in as {bot.user}')
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ Slash commands synced: {len(synced)}")
+    except Exception as e:
+        print(f"❌ Sync failed: {e}")
+    print(f"🤖 Bot is online as {bot.user}")
 
-@bot.event
-async def on_message(message):
-    if message.author == bot.user:
-        return
+@bot.tree.command(name="hi", description="Say hi")
+async def hi_command(interaction: discord.Interaction):
+    await interaction.response.send_message("Hey there! 👋 Click the button:", view=HiButtonView())
 
-    if message.content.lower() == 'ping':
-        await message.channel.send('pong')
-
-    await bot.process_commands(message)  # Allows commands to work if you add any later
+TOKEN = os.getenv("TOKEN")
+if TOKEN is None:
+    raise ValueError("TOKEN is not set in the environment.")
 
 bot.run(TOKEN)
