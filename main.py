@@ -1,36 +1,29 @@
-from flask import Flask
-from threading import Thread
-import discord
 import os
+import discord
+from discord.ext import commands
+from dotenv import load_dotenv
 
-# --- Flask App for Keeping Alive ---
-app = Flask(__name__)
+load_dotenv()  # Loads environment variables from a .env file
 
-@app.route('/')
-def home():
-    return "Bot is alive!", 200
+TOKEN = os.getenv('BOT_TOKEN')
 
-def run_flask():
-    app.run(host='0.0.0.0', port=8080)
-
-# Start Flask server in background thread
-Thread(target=run_flask).start()
-
-# --- Discord Bot Setup ---
 intents = discord.Intents.default()
-intents.message_content = True  # Important for reading messages
-client = discord.Client(intents=intents)
+intents.message_content = True  # Needed to read message content
 
-@client.event
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+@bot.event
 async def on_ready():
-    print(f'✅ Bot logged in as {client.user}')
+    print(f'🤖 Logged in as {bot.user}')
 
-@client.event
+@bot.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author == bot.user:
         return
-    if message.content.lower() == "ping":
-        await message.channel.send("Pong!")
 
-# --- Run the Bot ---
-client.run(os.environ["TOKEN"])
+    if message.content.lower() == 'ping':
+        await message.channel.send('pong')
+
+    await bot.process_commands(message)  # Allows commands to work if you add any later
+
+bot.run(TOKEN)
