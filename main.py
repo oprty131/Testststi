@@ -12,23 +12,18 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 class HiButtonView(discord.ui.View):
     @discord.ui.button(label="Say hi too", style=discord.ButtonStyle.primary)
     async def say_hi(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("hi too", ephemeral=False)
+        await interaction.response.send_message("hi too", ephemeral=True)
 
 @bot.event
 async def on_ready():
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ Slash commands synced: {len(synced)}")
-    except Exception as e:
-        print(f"❌ Sync failed: {e}")
-    print(f"🤖 Bot is online as {bot.user}")
+    await bot.tree.sync()
+    print(f"Bot is online as {bot.user}")
 
-@bot.tree.command(name="hi", description="Say hi")
+@bot.tree.command(name="Test", description="test rai")
 async def hi_command(interaction: discord.Interaction):
-    await interaction.response.send_message("Hey there! 👋 Click the button:", view=HiButtonView())
+    await interaction.response.send_message("Hey Test:", view=HiButtonView(), ephemeral=True)
 
-TOKEN = os.getenv("TOKEN")
-if TOKEN is None:
-    raise ValueError("TOKEN is not set in the environment.")
-
-bot.run(TOKEN)
+token = os.getenv("TOKEN")
+if not token:
+    raise ValueError("TOKEN not set in environment.")
+bot.run(token)
