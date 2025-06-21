@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Loads environment variables from a .env file
 
-TOKEN = os.getenv('BOT_TOKEN')
+TOKEN = os.getenv('TOKEN')
 
 intents = discord.Intents.default()
 intents.message_content = True  # Needed to read message content
