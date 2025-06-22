@@ -18,7 +18,30 @@ def home():
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
+    
+WHITELIST_FILE = "whitelist.json"
+MAPPING_FILE = "mapping.json"
 
+def load_whitelist():
+    if not os.path.isfile(WHITELIST_FILE):
+        return []
+    with open(WHITELIST_FILE, "r") as f:
+        return json.load(f)
+
+def save_whitelist(data):
+    with open(WHITELIST_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+def load_mapping():
+    if not os.path.isfile(MAPPING_FILE):
+        return {}
+    with open(MAPPING_FILE, "r") as f:
+        return json.load(f)
+
+def save_mapping(data):
+    with open(MAPPING_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+        
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -29,9 +52,9 @@ class CustomMessageButtonView(discord.ui.View):
         super().__init__(timeout=None)
         self.message = message
 
-    @discord.ui.button(label="Send Message", style=discord.ButtonStyle.primary)
-    async def send_custom_message(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(self.message, ephemeral=False)
+@discord.ui.button(label="Send Message", style=discord.ButtonStyle.primary)
+async def send_custom_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+    await interaction.response.send_message(self.message, ephemeral=False)
 
 @bot.event
 async def on_ready():
@@ -45,9 +68,18 @@ async def say_command(interaction: discord.Interaction, message: str):
     await interaction.response.send_message(f"Click the button to send your message.", view=view, ephemeral=True)
 
 @bot.tree.command(name="whitelist", description="Add a user ID to the whitelist")
+@has_required_permissions()
 @app_commands.describe(userid="Roblox user ID to whitelist")
 async def whitelist(interaction: discord.Interaction, userid: int):
     try:
+        discord_id = str(interaction.user.id)
+        mapping = load_mapping()
+        if discord_id in mapping:
+            await interaction.response.send_message(
+                "❌ You already whitelisted a Roblox user. Use /replacewhitelist to change it.", ephemeral=True
+            )
+            return
+
         user_info = requests.get(f"https://users.roblox.com/v1/users/{userid}")
         if user_info.status_code != 200:
             await interaction.response.send_message(f"❌ User ID `{userid}` does not exist on Roblox.", ephemeral=True)
@@ -55,44 +87,48 @@ async def whitelist(interaction: discord.Interaction, userid: int):
         user_data = user_info.json()
         username = user_data.get("name", "Unknown")
         avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={userid}&width=420&height=420&format=png"
-        response = requests.get("https://peeky.pythonanywhere.com/UserIdTestTable")
-        table_code = response.text.strip()
-        start = table_code.find("{") + 1
-        end = table_code.find("}")
-        current_ids = [int(i.strip()) for i in table_code[start:end].split(",") if i.strip().isdigit()]
-        if userid in current_ids:
+
+        whitelist = load_whitelist()
+        if userid in whitelist:
             embed = discord.Embed(
                 title="ℹ️ Already Whitelisted",
                 description=f"**{username}** (`{userid}`) is already in the whitelist.",
                 color=0xFFFF00
             )
-            embed.set_thumbnail(url=avatar_url)
+            embed.set_image(url=avatar_url)
             await interaction.response.send_message(embed=embed, ephemeral=False)
             return
-        current_ids.append(userid)
-        new_table = "return {\n    " + ",\n    ".join(map(str, current_ids)) + "\n}"
-        post_response = requests.post(
-            "https://peeky.pythonanywhere.com/edit/UserIdTestTable",
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            data={"content": new_table}
+
+        whitelist.append(userid)
+        save_whitelist(whitelist)
+
+        mapping[discord_id] = userid
+        save_mapping(mapping)
+
+        embed = discord.Embed(
+            title="✅ Whitelisted",
+            description=f"**{username}** (`{userid}`) has been added to the whitelist.",
+            color=0x00FF00
         )
-        if post_response.status_code == 200:
-            embed = discord.Embed(
-                title="✅ Whitelisted",
-                description=f"**{username}** (`{userid}`) has been added to the whitelist.",
-                color=0x00FF00
-            )
-            embed.set_thumbnail(url=avatar_url)
-            await interaction.response.send_message(embed=embed, ephemeral=False)
-        else:
-            await interaction.response.send_message(f"❌ Failed to update. Status {post_response.status_code}", ephemeral=True)
+        embed.set_image(url=avatar_url)
+        await interaction.response.send_message(embed=embed, ephemeral=False)
+
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
-        
-@bot.tree.command(name="replacewhitelist", description="Replace an old user ID in the whitelist with a new one")
-@app_commands.describe(old_userid="The UserId to replace", new_userid="The new UserId")
-async def replacewhitelist(interaction: discord.Interaction, old_userid: int, new_userid: int):
+
+@bot.tree.command(name="replacewhitelist", description="Replace your whitelisted user ID with a new one")
+@has_required_permissions()
+@app_commands.describe(new_userid="The new Roblox user ID to whitelist")
+async def replacewhitelist(interaction: discord.Interaction, new_userid: int):
     try:
+        discord_id = str(interaction.user.id)
+        mapping = load_mapping()
+        if discord_id not in mapping:
+            await interaction.response.send_message("❌ You have no whitelisted user to replace. Use /whitelist first.", ephemeral=True)
+            return
+
+        old_userid = mapping[discord_id]
+
         user_info = requests.get(f"https://users.roblox.com/v1/users/{new_userid}")
         if user_info.status_code != 200:
             await interaction.response.send_message(f"❌ New user ID `{new_userid}` does not exist on Roblox.", ephemeral=True)
@@ -101,77 +137,60 @@ async def replacewhitelist(interaction: discord.Interaction, old_userid: int, ne
         username = user_data.get("name", "Unknown")
         avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={new_userid}&width=420&height=420&format=png"
 
-        response = requests.get("https://peeky.pythonanywhere.com/UserIdTestTable")
-        table_code = response.text.strip()
-        start = table_code.find("{") + 1
-        end = table_code.find("}")
-        current_ids = [int(i.strip()) for i in table_code[start:end].split(",") if i.strip().isdigit()]
+        whitelist = load_whitelist()
 
-        if old_userid not in current_ids:
-            await interaction.response.send_message(f"❌ Old user ID `{old_userid}` is not in the whitelist.", ephemeral=True)
+        if old_userid not in whitelist:
+            await interaction.response.send_message("❌ Your old user ID is not in the whitelist anymore.", ephemeral=True)
             return
 
-        index = current_ids.index(old_userid)
-        if new_userid not in current_ids:
-            current_ids[index] = new_userid
+        index = whitelist.index(old_userid)
+        if new_userid not in whitelist:
+            whitelist[index] = new_userid
         else:
-            current_ids.pop(index)
+            whitelist.pop(index)
 
-        new_table = "return {\n    " + ",\n    ".join(map(str, current_ids)) + "\n}"
-        post_response = requests.post(
-            "https://peeky.pythonanywhere.com/edit/UserIdTestTable",
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            data={"content": new_table}
+        save_whitelist(whitelist)
+
+        mapping[discord_id] = new_userid
+        save_mapping(mapping)
+
+        embed = discord.Embed(
+            title="✅ Whitelist Updated",
+            description=f"Replaced your Roblox ID with **{username}** (`{new_userid}`).",
+            color=0x00FF00
         )
+        embed.set_image(url=avatar_url)
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
-        if post_response.status_code == 200:
-            embed = discord.Embed(
-                title="✅ Whitelist Updated",
-                description=f"Replaced `{old_userid}` with **{username}** (`{new_userid}`) in the whitelist.",
-                color=0x00FF00
-            )
-            embed.set_image(url=avatar_url)
-            await interaction.response.send_message(embed=embed, ephemeral=False)
-        else:
-            await interaction.response.send_message(f"❌ Failed to update. Status {post_response.status_code}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
-        
-@bot.tree.command(name="check", description="Check if a UserId Whitelisted")
-@app_commands.describe(userid="UseId to check")
-async def checkwhitelist(interaction: discord.Interaction, userid: int):
+
+@bot.tree.command(name="check", description="Check which Roblox user ID you have whitelisted")
+async def check(interaction: discord.Interaction):
     try:
-        response = requests.get("https://peeky.pythonanywhere.com/UserIdTestTable")
-        table_code = response.text.strip()
-        start = table_code.find("{") + 1
-        end = table_code.find("}")
-        current_ids = [int(i.strip()) for i in table_code[start:end].split(",") if i.strip().isdigit()]
+        discord_id = str(interaction.user.id)
+        mapping = load_mapping()
+        if discord_id not in mapping:
+            await interaction.response.send_message("❌ You have not whitelisted any Roblox user.", ephemeral=True)
+            return
+
+        userid = mapping[discord_id]
 
         user_info = requests.get(f"https://users.roblox.com/v1/users/{userid}")
         if user_info.status_code != 200:
-            await interaction.response.send_message(f"❌ User ID `{userid}` does not exist on Roblox.", ephemeral=True)
+            await interaction.response.send_message("❌ Your whitelisted Roblox user ID does not exist anymore.", ephemeral=True)
             return
         user_data = user_info.json()
         username = user_data.get("name", "Unknown")
         avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={userid}&width=420&height=420&format=png"
 
-        if userid in current_ids:
-            embed = discord.Embed(
-                title="✅ Whitelist Check",
-                description=f"**{username}** (`{userid}`) is Whitelisted.",
-                color=0x00FF00
-            )
-            embed.set_image(url=avatar_url)
-        else:
-            embed = discord.Embed(
-                title="❌ Whitelist Check",
-                description=f"**{username}** (`{userid}`) is Not Whitelisted.",
-                color=0xFF0000
-            )
-            embed.set_image(url=avatar_url)
-
+        embed = discord.Embed(
+            title="Your Whitelisted acc",
+            description=f"**{username}** (`{userid}`)",
+            color=0x00FF00
+        )
+        embed.set_image(url=avatar_url)
         await interaction.response.send_message(embed=embed, ephemeral=False)
-
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
