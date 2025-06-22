@@ -88,6 +88,52 @@ async def whitelist(interaction: discord.Interaction, userid: int):
             await interaction.response.send_message(f"❌ Failed to update. Status {post_response.status_code}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+        
+@bot.tree.command(name="replacewhitelist", description="Replace an old user ID in the whitelist with a new one")
+@app_commands.describe(old_userid="The user ID to replace", new_userid="The new user ID to insert")
+async def replacewhitelist(interaction: discord.Interaction, old_userid: int, new_userid: int):
+    try:
+        user_info = requests.get(f"https://users.roblox.com/v1/users/{new_userid}")
+        if user_info.status_code != 200:
+            await interaction.response.send_message(f"❌ New user ID `{new_userid}` does not exist on Roblox.", ephemeral=True)
+            return
+        user_data = user_info.json()
+        username = user_data.get("name", "Unknown")
+        avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={new_userid}&width=420&height=420&format=png"
+
+        response = requests.get("https://peeky.pythonanywhere.com/UserIdTestTable")
+        table_code = response.text.strip()
+        start = table_code.find("{") + 1
+        end = table_code.find("}")
+        current_ids = [int(i.strip()) for i in table_code[start:end].split(",") if i.strip().isdigit()]
+
+        if old_userid not in current_ids:
+            await interaction.response.send_message(f"❌ Old user ID `{old_userid}` is not in the whitelist.", ephemeral=True)
+            return
+
+        current_ids = [i for i in current_ids if i != old_userid]
+        if new_userid not in current_ids:
+            current_ids.append(new_userid)
+
+        new_table = "return {\n    " + ",\n    ".join(map(str, current_ids)) + "\n}"
+        post_response = requests.post(
+            "https://peeky.pythonanywhere.com/edit/UserIdTestTable",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={"content": new_table}
+        )
+
+        if post_response.status_code == 200:
+            embed = discord.Embed(
+                title="🔁 Whitelist Updated",
+                description=f"Replaced `{old_userid}` with **{username}** (`{new_userid}`) in the whitelist.",
+                color=0x3498db
+            )
+            embed.set_image(url=avatar_url)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
+        else:
+            await interaction.response.send_message(f"❌ Failed to update. Status {post_response.status_code}", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
 token = os.getenv("TOKEN")
 if not token:
