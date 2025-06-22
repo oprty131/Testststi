@@ -48,13 +48,26 @@ async def say_command(interaction: discord.Interaction, message: str):
 @app_commands.describe(userid="Roblox user ID to whitelist")
 async def whitelist(interaction: discord.Interaction, userid: int):
     try:
+        user_info = requests.get(f"https://users.roblox.com/v1/users/{userid}")
+        if user_info.status_code != 200:
+            await interaction.response.send_message(f"❌ User ID `{userid}` does not exist on Roblox.", ephemeral=True)
+            return
+        user_data = user_info.json()
+        username = user_data.get("name", "Unknown")
+        avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={userid}&width=420&height=420&format=png"
         response = requests.get("https://peeky.pythonanywhere.com/UserIdTestTable")
         table_code = response.text.strip()
         start = table_code.find("{") + 1
         end = table_code.find("}")
         current_ids = [int(i.strip()) for i in table_code[start:end].split(",") if i.strip().isdigit()]
         if userid in current_ids:
-            await interaction.response.send_message(f"User ID `{userid}` is already whitelisted!", ephemeral=True)
+            embed = discord.Embed(
+                title="ℹ️ Already Whitelisted",
+                description=f"**{username}** (`{userid}`) is already in the whitelist.",
+                color=0xFFFF00
+            )
+            embed.set_thumbnail(url=avatar_url)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
             return
         current_ids.append(userid)
         new_table = "return {\n    " + ",\n    ".join(map(str, current_ids)) + "\n}"
@@ -64,7 +77,13 @@ async def whitelist(interaction: discord.Interaction, userid: int):
             data={"content": new_table}
         )
         if post_response.status_code == 200:
-            await interaction.response.send_message(f"✅ Whitelisted `{userid}`.", ephemeral=True)
+            embed = discord.Embed(
+                title="✅ Whitelisted",
+                description=f"**{username}** (`{userid}`) has been added to the whitelist.",
+                color=0x00FF00
+            )
+            embed.set_thumbnail(url=avatar_url)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
         else:
             await interaction.response.send_message(f"❌ Failed to update. Status {post_response.status_code}", ephemeral=True)
     except Exception as e:
