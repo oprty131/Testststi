@@ -2,11 +2,22 @@ import discord
 import os
 import requests
 import datetime
+import threading
 from discord.ext import commands
 from discord import app_commands
+from flask import Flask
 from dotenv import load_dotenv
 
 load_dotenv()
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is alive!", 200
+
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -95,4 +106,8 @@ async def replace(interaction: discord.Interaction, old_userid: int, new_userid:
 token = os.getenv("TOKEN")
 if not token:
     raise ValueError("TOKEN not set in environment.")
+
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.start()
+
 bot.run(token)
