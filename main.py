@@ -1,6 +1,7 @@
 import discord
 import os
 import requests
+import json
 import datetime
 import threading
 from discord.ext import commands
@@ -68,7 +69,6 @@ async def say_command(interaction: discord.Interaction, message: str):
     await interaction.response.send_message(f"Click the button to send your message.", view=view, ephemeral=True)
 
 @bot.tree.command(name="whitelist", description="Add a user ID to the whitelist")
-@has_required_permissions()
 @app_commands.describe(userid="Roblox user ID to whitelist")
 async def whitelist(interaction: discord.Interaction, userid: int):
     try:
@@ -117,7 +117,6 @@ async def whitelist(interaction: discord.Interaction, userid: int):
         await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
 @bot.tree.command(name="replacewhitelist", description="Replace your whitelisted user ID with a new one")
-@has_required_permissions()
 @app_commands.describe(new_userid="The new Roblox user ID to whitelist")
 async def replacewhitelist(interaction: discord.Interaction, new_userid: int):
     try:
