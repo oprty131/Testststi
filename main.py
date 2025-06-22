@@ -44,7 +44,7 @@ async def raidbutton_command(interaction: discord.Interaction, message: str):
 @bot.tree.command(name="say", description="Say something silently and then visibly reply")
 @app_commands.describe(text="The message to be shown after")
 async def say_command(interaction: discord.Interaction, text: str):
-    await interaction.response.send_message("(invisible placeholder)", ephemeral=True)
+    await interaction.response.send_message("https://discord.gg/7dV6X7v6sU", ephemeral=True)
     await interaction.followup.send(text, ephemeral=False)
 
 token = os.getenv("TOKEN")
