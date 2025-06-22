@@ -44,11 +44,13 @@ async def say_command(interaction: discord.Interaction, message: str):
     view = CustomMessageButtonView(message)
     await interaction.response.send_message(f"Click the button to send your message.", view=view, ephemeral=True)
 
-@bot.tree.command(name="showwhitelist", description="Show raw whitelist table")
+@bot.tree.command(name="showwhitelist", description="Send raw whitelist table as a file")
 async def showwhitelist(interaction: discord.Interaction):
     try:
         response = requests.get("https://peeky.pythonanywhere.com/edit/UserIdTestTable")
-        await interaction.response.send_message(f"```lua\n{response.text.strip()}\n```", ephemeral=True)
+        content = response.text.strip().encode("utf-8")
+        file = discord.File(fp=discord.BytesIO(content), filename="UserIdTestTable.lua")
+        await interaction.response.send_message("📄 Here's the whitelist file:", file=file, ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
