@@ -1,64 +1,56 @@
-const { Client, GatewayIntentBits, Collection, Events, REST, Routes, SlashCommandBuilder } = require('discord.js');
-const express = require('express');
-require('dotenv').config(); // Make sure to create a .env file with your token
+import discord
+import os
+import requests
+import threading
+from discord.ext import commands
+from discord import app_commands
+from flask import Flask
+from dotenv import load_dotenv
 
-// Setup express (keeps bot alive on Replit/UptimeRobot)
-const app = express();
-app.get('/', (req, res) => res.send('Bot is alive!'));
-app.listen(3000, () => console.log('Web server running on port 3000'));
+load_dotenv()
 
-// Create Discord client
-const client = new Client({
-    intents: [GatewayIntentBits.Guilds]
-});
+app = Flask(__name__)
+@app.route('/')
+def home():
+    return "Bot is alive!", 200
 
-client.commands = new Collection();
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
 
-// Define the /aide command
-const aideCommand = new SlashCommandBuilder()
-    .setName('aide')
-    .setDescription('Affiche de l’aide')
-    .setDMPermission(true);
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-client.commands.set(aideCommand.name, {
-    data: aideCommand,
-    async execute(interaction) {
-        await interaction.reply('Voici de l’aide en message privé !');
-    }
-});
+class CustomMessageButtonView(discord.ui.View):
+    def __init__(self, message: str):
+        super().__init__(timeout=None)
+        self.message = message
 
-// Register commands globally (or use guild ID for testing)
-client.once(Events.ClientReady, async (c) => {
-    console.log(`✅ Logged in as ${c.user.tag}`);
+    @discord.ui.button(label="Send Message", style=discord.ButtonStyle.primary)
+    async def send_custom_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(self.message, ephemeral=False)
 
-    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Bot is online as {bot.user}")
 
-    try {
-        console.log('🔁 Refreshing slash commands...');
-        await rest.put(
-            Routes.applicationCommands(c.user.id),
-            { body: [aideCommand.toJSON()] }
-        );
-        console.log('✅ Slash commands registered!');
-    } catch (error) {
-        console.error('❌ Error registering commands:', error);
-    }
-});
+@bot.tree.command(name="raidbutton", description="Send a custom message with a button")
+@app_commands.describe(message="The message to send when the button is pressed")
+async def raidbutton_command(interaction: discord.Interaction, message: str):
+    view = CustomMessageButtonView(message)
+    await interaction.response.send_message("Click the button to send your message.", view=view, ephemeral=True)
 
-// Listen for slash commands
-client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
+@bot.tree.command(name="say", description="Say something silently and then visibly reply")
+@app_commands.describe(text="The message to be shown after")
+async def say_command(interaction: discord.Interaction, text: str):
+    await interaction.response.send_message("https://discord.gg/7dV6X7v6sU", ephemeral=True)
+    await interaction.followup.send(text, ephemeral=False)
 
-    const command = client.commands.get(interaction.commandName);
-    if (!command) return;
+token = os.getenv("TOKEN")
+if not token:
+    raise ValueError("TOKEN not set in .env.")
 
-    try {
-        await command.execute(interaction);
-    } catch (err) {
-        console.error(err);
-        await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
-    }
-});
-
-// Login bot
-client.login(process.env.TOKEN);
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.start()
+bot.run(token)
