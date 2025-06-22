@@ -44,78 +44,27 @@ async def say_command(interaction: discord.Interaction, message: str):
     view = CustomMessageButtonView(message)
     await interaction.response.send_message(f"Click the button to send your message.", view=view, ephemeral=True)
 
-def fetch_table():
-    r = requests.get("https://peeky.pythonanywhere.com/UserIdTestTable")
-    return eval(r.text.replace("return", "").strip())
-
-def update_table(user_ids):
-    lua_data = "return {\n" + ",\n".join(f"    {uid}" for uid in user_ids) + "\n}"
-    r = requests.post("https://peeky.pythonanywhere.com/edit/UserIdTestTable", data={"code": lua_data})
-    return r.ok
-
-@bot.tree.command(name="whitelist", description="Add a UserId to the premium whitelist")
-@app_commands.describe(userid="The Roblox UserId to whitelist")
+@bot.tree.command(name="whitelist", description="Add a user ID to the whitelist")
+@app_commands.describe(userid="Roblox user ID to whitelist")
 async def whitelist(interaction: discord.Interaction, userid: int):
-    await interaction.response.defer()  # avoid timeout
-
-    roblox_user = requests.get(f"https://users.roblox.com/v1/users/{userid}")
-    if roblox_user.status_code != 200:
-        await interaction.followup.send(f"❌ UserId `{userid}` is invalid or does not exist on Roblox.", ephemeral=True)
-        return
-
-    user_data = roblox_user.json()
-    username = user_data.get("name", "Unknown")
-
-    table = fetch_table()
-    if userid in table:
-        await interaction.followup.send(f"✅ UserId `{userid}` is already whitelisted (Username: `{username}`).", ephemeral=True)
-        return
-
-    table.append(userid)
-    if update_table(table):
-        avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={userid}&width=420&height=420&format=png"
-        embed = discord.Embed(
-            title="✅ Whitelisted Roblox Account",
-            description="Added new Roblox account to premium whitelist.",
-            color=0x00ff00
-        )
-        embed.add_field(name="UserID", value=str(userid), inline=False)
-        embed.add_field(name="Username", value=username, inline=False)
-        embed.set_thumbnail(url=avatar_url)
-        embed.set_footer(text="Powered by python blyat")
-        embed.timestamp = datetime.datetime.utcnow()
-        await interaction.followup.send(embed=embed)
-    else:
-        await interaction.followup.send("❌ Failed to update whitelist.", ephemeral=True)
-
-@bot.tree.command(name="replace", description="Replace an old UserId with a new one")
-@app_commands.describe(old_userid="Old Roblox UserId", new_userid="New Roblox UserId", old_username="Old username", new_username="New username")
-async def replace(interaction: discord.Interaction, old_userid: int, new_userid: int, old_username: str, new_username: str):
-    table = fetch_table()
-    if old_userid not in table:
-        await interaction.response.send_message(f"❌ Old UserId `{old_userid}` not found in whitelist.", ephemeral=True)
-        return
-    if new_userid in table:
-        await interaction.response.send_message(f"✅ New UserId `{new_userid}` is already whitelisted.", ephemeral=True)
-        return
-    table.remove(old_userid)
-    table.append(new_userid)
-    if update_table(table):
-        embed = discord.Embed(
-            title=f"{datetime.datetime.utcnow().strftime('%B %d, %Y')}",
-            description="Replaced your Roblox account at premium whitelist.",
-            color=discord.Color.green()
-        )
-        embed.add_field(name="Old UserID", value=str(old_userid), inline=False)
-        embed.add_field(name="Old Username", value=old_username, inline=False)
-        embed.add_field(name="New UserID", value=str(new_userid), inline=False)
-        embed.add_field(name="New Username", value=new_username, inline=False)
-        embed.set_footer(text="Powered by python blyat")
-        embed.set_thumbnail(url=f"https://tr.rbxcdn.com/ORIGINAL_THUMBNAIL/Avatar?userId={new_userid}&width=420&height=420&format=png")
-        embed.timestamp = datetime.datetime.utcnow()
-        await interaction.response.send_message(embed=embed)
-    else:
-        await interaction.response.send_message("❌ Failed to replace UserId.", ephemeral=True)
+    try:
+        response = requests.get("https://peeky.pythonanywhere.com/edit/UserIdTestTable")
+        table_code = response.text.strip()
+        start = table_code.find("{") + 1
+        end = table_code.find("}")
+        current_ids = [int(i.strip()) for i in table_code[start:end].split(",") if i.strip().isdigit()]
+        if userid in current_ids:
+            await interaction.response.send_message(f"User ID `{userid}` is already whitelisted!", ephemeral=True)
+            return
+        current_ids.append(userid)
+        new_table = "return {\n    " + ",\n    ".join(map(str, current_ids)) + "\n}"
+        post_response = requests.post("https://peeky.pythonanywhere.com/edit/UserIdTestTable", data={"code": new_table})
+        if post_response.status_code == 200:
+            await interaction.response.send_message(f"✅ Whitelisted `{userid}`.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Failed to update.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
 token = os.getenv("TOKEN")
 if not token:
