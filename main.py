@@ -11,19 +11,24 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-class HiButtonView(discord.ui.View):
-    @discord.ui.button(label="Say hi too", style=discord.ButtonStyle.primary)
-    async def say_hi(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("hi too", ephemeral=False)
+class SayButtonView(discord.ui.View):
+    def __init__(self, message):
+        super().__init__()
+        self.message = message
+
+    @discord.ui.button(label="raid keep pressing the button", style=discord.ButtonStyle.primary)
+    async def say_custom(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(self.message, ephemeral=False)
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
-@bot.tree.command(name="hi", description="Say hi")
-async def hi_command(interaction: discord.Interaction):
-    await interaction.response.send_message("Hey there daddy::", view=HiButtonView(), ephemeral=True)
+@bot.tree.command(name="raidbutton", description="click here to keep sending the message")
+@app_commands.describe(message="The message to send when you click the button")
+async def say_command(interaction: discord.Interaction, message: str):
+    await interaction.response.send_message("Click the button to send it:", view=SayButtonView(message), ephemeral=True)
 
 token = os.getenv("TOKEN")
 if not token:
