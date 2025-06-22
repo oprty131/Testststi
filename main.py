@@ -56,23 +56,37 @@ def update_table(user_ids):
 @bot.tree.command(name="whitelist", description="Add a UserId to the premium whitelist")
 @app_commands.describe(userid="The Roblox UserId to whitelist")
 async def whitelist(interaction: discord.Interaction, userid: int):
+    await interaction.response.defer()  # avoid timeout
+
+    roblox_user = requests.get(f"https://users.roblox.com/v1/users/{userid}")
+    if roblox_user.status_code != 200:
+        await interaction.followup.send(f"❌ UserId `{userid}` is invalid or does not exist on Roblox.", ephemeral=True)
+        return
+
+    user_data = roblox_user.json()
+    username = user_data.get("name", "Unknown")
+
     table = fetch_table()
     if userid in table:
-        await interaction.response.send_message(f"✅ UserId `{userid}` is already whitelisted.", ephemeral=True)
+        await interaction.followup.send(f"✅ UserId `{userid}` is already whitelisted (Username: `{username}`).", ephemeral=True)
         return
+
     table.append(userid)
     if update_table(table):
+        avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={userid}&width=420&height=420&format=png"
         embed = discord.Embed(
             title="✅ Whitelisted Roblox Account",
-            description=f"Added new Roblox account to premium whitelist.",
+            description="Added new Roblox account to premium whitelist.",
             color=0x00ff00
         )
         embed.add_field(name="UserID", value=str(userid), inline=False)
+        embed.add_field(name="Username", value=username, inline=False)
+        embed.set_thumbnail(url=avatar_url)
         embed.set_footer(text="Powered by python blyat")
         embed.timestamp = datetime.datetime.utcnow()
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
     else:
-        await interaction.response.send_message("❌ Failed to update whitelist.", ephemeral=True)
+        await interaction.followup.send("❌ Failed to update whitelist.", ephemeral=True)
 
 @bot.tree.command(name="replace", description="Replace an old UserId with a new one")
 @app_commands.describe(old_userid="Old Roblox UserId", new_userid="New Roblox UserId", old_username="Old username", new_username="New username")
