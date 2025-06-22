@@ -50,23 +50,41 @@ async def whitelist(interaction: discord.Interaction, userid: int):
     try:
         response = requests.get("https://peeky.pythonanywhere.com/edit/UserIdTestTable")
         table_code = response.text.strip()
+
+        if not table_code.startswith("return {"):
+            await interaction.response.send_message("❌ Invalid table format returned from server.", ephemeral=True)
+            return
+
         start = table_code.find("{") + 1
         end = table_code.find("}")
-        current_ids = [int(i.strip()) for i in table_code[start:end].split(",") if i.strip().isdigit()]
+        raw_list = table_code[start:end].strip()
+
+        current_ids = []
+        for line in raw_list.split(","):
+            stripped = line.strip()
+            if stripped.isdigit():
+                current_ids.append(int(stripped))
+
         if userid in current_ids:
             await interaction.response.send_message(f"User ID `{userid}` is already whitelisted!", ephemeral=True)
             return
+
         current_ids.append(userid)
+        current_ids = list(dict.fromkeys(current_ids))  # remove accidental duplicates
+
         new_table = "return {\n    " + ",\n    ".join(map(str, current_ids)) + "\n}"
+
         post_response = requests.post(
             "https://peeky.pythonanywhere.com/edit/UserIdTestTable",
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             data={"content": new_table}
         )
+
         if post_response.status_code == 200:
             await interaction.response.send_message(f"✅ Whitelisted `{userid}`.", ephemeral=True)
         else:
             await interaction.response.send_message(f"❌ Failed to update. Status {post_response.status_code}", ephemeral=True)
+
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
 
