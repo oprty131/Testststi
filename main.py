@@ -69,7 +69,7 @@ async def kokobutton_command(interaction: discord.Interaction, message: str, cou
     view = KokoButtonView(message, count)
     await interaction.response.send_message(f"Click the button to send the message {count} times.", view=view, ephemeral=True)
 
-@bot.tree.command(name="say", description="Say something silently and then visibly reply")
+@bot.tree.command(name="say", description="Make the bot say something")
 @app_commands.describe(text="The message to be shown after")
 async def say_command(interaction: discord.Interaction, text: str):
     await interaction.response.send_message("https://discord.gg/7dV6X7v6sU", ephemeral=True)
