@@ -29,7 +29,7 @@ class CustomMessageButtonView(discord.ui.View):
     @discord.ui.button(label="Send Message", style=discord.ButtonStyle.primary)
     async def send_custom_message(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(self.message, ephemeral=False)
-
+    
 class KokoButtonView(discord.ui.View):
     def __init__(self, message: str, count: int):
         super().__init__(timeout=None)
@@ -41,8 +41,9 @@ class KokoButtonView(discord.ui.View):
         if self.count > 5:
             await interaction.response.send_message("Count max is 5.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=False)
         for _ in range(self.count):
-           await interaction.response.send_message(self.message, ephemeral=False)
+            await interaction.followup.send(self.message)
 
 @bot.event
 async def on_ready():
