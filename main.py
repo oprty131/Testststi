@@ -31,37 +31,42 @@ class CustomMessageButtonView(discord.ui.View):
         await interaction.response.send_message(self.message, ephemeral=False)
 
 class KokoButtonView(discord.ui.View):
-    def __init__(self, message: str):
+    def __init__(self, message: str, count: int):
         super().__init__(timeout=None)
         self.message = message
+        self.count = count
 
-    @discord.ui.button(label="Send x5", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Send", style=discord.ButtonStyle.primary)
     async def send_multiple(self, interaction: discord.Interaction, button: discord.ui.Button):
-        for _ in range(5):
-            await interaction.channel.send(self.message)
+        if self.count > 5:
+            await interaction.response.send_message("Count max is 5.", ephemeral=True)
+            return
+        for _ in range(self.count):
+           await interaction.response.send_message(self.message, ephemeral=False)
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
     
-@bot.tree.command(name="flood", description="Send a message up to 5 times")
+@bot.tree.command(name="flood", description="Send a message repeatedly")
 @app_commands.describe(text="The message to repeat", count="How many times to send the message (max 5)")
 async def koko_command(interaction: discord.Interaction, text: str, count: int):
     if count > 5:
-        await interaction.response.send_message("❌ Count must not be more than 5.", ephemeral=True)
+        await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
-
     await interaction.response.send_message("https://discord.gg/7dV6X7v6sU", ephemeral=True)
-
     for _ in range(count):
         await interaction.followup.send(text)
     
-@bot.tree.command(name="floodbutton", description="Send a message 5 times using a button")
-@app_commands.describe(message="The message to send 5 times when the button is pressed")
-async def kokobutton_command(interaction: discord.Interaction, message: str):
-    view = KokoButtonView(message)
-    await interaction.response.send_message("Click the button to send the message 5 times.", view=view, ephemeral=True)
+@bot.tree.command(name="floodbutton", description="Send a message multiple times using a button")
+@app_commands.describe(message="The message to send", count="How many times to send it (max 5)")
+async def kokobutton_command(interaction: discord.Interaction, message: str, count: int):
+    if count > 5:
+        await interaction.response.send_message("Count max is 5.", ephemeral=True)
+        return
+    view = KokoButtonView(message, count)
+    await interaction.response.send_message(f"Click the button to send the message {count} times.", view=view, ephemeral=True)
 
 @bot.tree.command(name="say", description="Say something silently and then visibly reply")
 @app_commands.describe(text="The message to be shown after")
