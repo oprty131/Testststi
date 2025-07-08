@@ -95,20 +95,23 @@ async def raidbutton_command(interaction: discord.Interaction, message: str):
 @app_commands.describe(username="The username or display name of the target player", placeid="The PlaceId of the game")
 async def snipe(interaction: discord.Interaction, username: str, placeid: int):
     await interaction.response.defer(thinking=True)
-    
-    # Shared state to allow cancel behavior
+
+    # Shared state
     if hasattr(bot, "snipe_task") and bot.snipe_task and not bot.snipe_task.done():
-        if not hasattr(bot, "snipe_debounce") or not bot.snipe_debounce:
-            bot.snipe_debounce = True
-            await interaction.followup.send("⚠️ Click again within 3 seconds to cancel...", ephemeral=True)
-            await asyncio.sleep(3)
-            bot.snipe_debounce = False
-        else:
-            bot.snipe_task.cancel()
-            await interaction.followup.send("❌ Scan cancelled.", ephemeral=True)
-            return
+        await interaction.followup.send("⚠️ A scan is already running.", ephemeral=True)
         return
-    
+
+    class CancelButtonView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=None)
+
+        @discord.ui.button(label="❌ Cancel Scan", style=discord.ButtonStyle.danger)
+        async def cancel(self, interaction2: discord.Interaction, button: discord.ui.Button):
+            if hasattr(bot, "snipe_task") and bot.snipe_task:
+                bot.snipe_task.cancel()
+                await interaction2.response.send_message("✅ Scan cancelled.", ephemeral=True)
+                self.stop()
+
     async def get_user_id(name):
         async with aiohttp.ClientSession() as session:
             async with session.get(f"https://api.roblox.com/users/get-by-username?username={name}") as resp:
@@ -135,20 +138,37 @@ async def snipe(interaction: discord.Interaction, username: str, placeid: int):
                 data = await resp.json()
                 return [d["imageUrl"] for d in data["data"]]
 
+    # Embed
+    embed = discord.Embed(
+        title="🎯 Stream Sniper",
+        description="Initializing scan...",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="Target Username", value=username, inline=True)
+    embed.add_field(name="Place ID", value=str(placeid), inline=True)
+    view = CancelButtonView()
+    status_message = await interaction.followup.send(embed=embed, view=view, wait=True)
+
+    async def update_embed_status(text, thumb=None):
+        embed.description = text
+        if thumb:
+            embed.set_image(url=thumb)
+        await status_message.edit(embed=embed, view=view)
+
     async def run_scan():
         user_id = await get_user_id(username)
         if not user_id:
-            await interaction.followup.send(f"❌ Could not find user `{username}`.", ephemeral=True)
+            await update_embed_status(f"❌ Could not find Roblox user `{username}`.")
             return
 
-        await interaction.followup.send("📷 Loading avatar...", ephemeral=True)
+        await update_embed_status("📷 Loading avatar...")
         avatar_url = await get_avatar(user_id)
 
         page = 1
         found = False
         cursor = ""
 
-        await interaction.followup.send("🛰️ Scanning servers...", ephemeral=True)
+        await update_embed_status("🛰️ Scanning servers...")
 
         try:
             while True:
@@ -161,14 +181,23 @@ async def snipe(interaction: discord.Interaction, username: str, placeid: int):
                         data = await resp.json()
 
                 for i, server in enumerate(data["data"]):
-                    await interaction.followup.send(f"🔎 Page {page} - Server {i+1}/{len(data['data'])} ({server['playing']} players)...", ephemeral=True)
-
                     if "playerTokens" not in server:
                         continue
+
                     avatars = await get_server_avatars(server["playerTokens"])
+                    thumb = avatars[0] if avatars else None
+
+                    await update_embed_status(
+                        f"🔎 Page {page} — Server {i+1}/{len(data['data'])} ({server['playing']} players)...",
+                        thumb=thumb
+                    )
+
                     if avatar_url in avatars:
                         join_link = f"https://www.roblox.com/games/{placeid}?privateServerLinkCode=&gameInstanceId={server['id']}"
-                        await interaction.followup.send(f"🎯 **Found `{username}`!** Join: {join_link}")
+                        embed.description = f"✅ **Player found!**\n[Click to Join]({join_link})"
+                        embed.set_thumbnail(url=avatar_url)
+                        embed.set_image(url=None)
+                        await status_message.edit(embed=embed, view=None)
                         found = True
                         return
 
@@ -179,12 +208,11 @@ async def snipe(interaction: discord.Interaction, username: str, placeid: int):
                 await asyncio.sleep(1)
 
             if not found:
-                await interaction.followup.send("⚠️ The player was not found in any public server.")
+                await update_embed_status("⚠️ The player was not found in any public server.")
         except asyncio.CancelledError:
-            await interaction.followup.send("❌ Scan cancelled early.")
+            await update_embed_status("❌ Scan cancelled.")
         finally:
             bot.snipe_task = None
-            bot.snipe_debounce = False
 
     bot.snipe_task = asyncio.create_task(run_scan())
         
