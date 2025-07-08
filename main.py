@@ -21,19 +21,27 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+COOL_USER_ID = 123456789012345678  # Replace with your actual user ID
+cool_mode_enabled = {}  # Tracks cool mode status per user
+
+def apply_coolmode(user_id: int, message: str) -> str:
+    if user_id == COOL_USER_ID and cool_mode_enabled.get(user_id, False):
+        return message + " hi"
+    return message
+
 class CustomMessageButtonView(discord.ui.View):
-    def __init__(self, message: str):
+    def __init__(self, message: str, user_id: int):
         super().__init__(timeout=None)
-        self.message = message
+        self.message = apply_coolmode(user_id, message)
 
     @discord.ui.button(label="Send Message", style=discord.ButtonStyle.primary)
     async def send_custom_message(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(self.message, ephemeral=False)
-    
+
 class KokoButtonView(discord.ui.View):
-    def __init__(self, message: str, count: int):
+    def __init__(self, message: str, count: int, user_id: int):
         super().__init__(timeout=None)
-        self.message = message
+        self.message = apply_coolmode(user_id, message)
         self.count = count
 
     @discord.ui.button(label="Send", style=discord.ButtonStyle.primary)
@@ -50,17 +58,33 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
+@bot.tree.command(name="coolmode", description="Toggle cool mode on/off (only for authorized user)")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+@app_commands.describe(status="on or off")
+async def coolmode_command(interaction: discord.Interaction, status: str):
+    if interaction.user.id != COOL_USER_ID:
+        await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+        return
+
+    status = status.lower()
+    if status not in ["on", "off"]:
+        await interaction.response.send_message("Please choose either 'on' or 'off'.", ephemeral=True)
+        return
+
+    cool_mode_enabled[interaction.user.id] = (status == "on")
+    await interaction.response.send_message(f"Cool mode has been turned **{status}**.", ephemeral=True)
+
 @bot.tree.command(name="flood", description="Send a message repeatedly")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(text="The message to repeat", count="How many times to send the message (max 5)")
 async def koko_command(interaction: discord.Interaction, text: str, count: int):
-    if interaction.user.id == 1265687947630481552:
-        text += " hi"
     if count > 5:
         await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
     await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
+    text = apply_coolmode(interaction.user.id, text)
     for _ in range(count):
         await interaction.followup.send(text)
 
@@ -69,12 +93,10 @@ async def koko_command(interaction: discord.Interaction, text: str, count: int):
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(message="The message to send", count="How many times to send it (max 5)")
 async def kokobutton_command(interaction: discord.Interaction, message: str, count: int):
-    if interaction.user.id == 1265687947630481552:
-        message += " hi"
     if count > 5:
         await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
-    view = KokoButtonView(message, count)
+    view = KokoButtonView(message, count, interaction.user.id)
     await interaction.response.send_message(f"Click the button to send the message {count} times.", view=view, ephemeral=True)
 
 @bot.tree.command(name="say", description="Make the bot say something")
@@ -82,9 +104,8 @@ async def kokobutton_command(interaction: discord.Interaction, message: str, cou
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(text="The message to be shown after")
 async def say_command(interaction: discord.Interaction, text: str):
-    if interaction.user.id == 1265687947630481552:
-        text += " hi"
     await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
+    text = apply_coolmode(interaction.user.id, text)
     await interaction.followup.send(text)
 
 @bot.tree.command(name="saybutton", description="Send a custom message with a button")
@@ -92,9 +113,7 @@ async def say_command(interaction: discord.Interaction, text: str):
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(message="The message to send when the button is pressed")
 async def raidbutton_command(interaction: discord.Interaction, message: str):
-    if interaction.user.id == 1265687947630481552:
-        message += " hi"
-    view = CustomMessageButtonView(message)
+    view = CustomMessageButtonView(message, interaction.user.id)
     await interaction.response.send_message("Click the button to send your message.", view=view, ephemeral=True)
 
 token = os.getenv("TOKEN")
