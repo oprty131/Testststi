@@ -2,6 +2,7 @@ import discord
 import os
 import requests
 import threading
+import aiohttp
 from discord.ext import commands
 from discord import app_commands
 from flask import Flask
@@ -21,18 +22,21 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-COOL_USER_ID = 1265687947630481552
-cool_mode_enabled = {}
+PEEKY_ID = 1265687947630481552
+GAY_USER_ID = 1391486635962798242
 
-def apply_coolmode(user_id: int, message: str) -> str:
-    if user_id == COOL_USER_ID and cool_mode_enabled.get(user_id, False):
-        return message + " hi"
+gay_mode_enabled = False
+gay_mode_text = " i'm gay"
+
+def gaymode(user_id: int, message: str) -> str:
+    if user_id == GAY_USER_ID and gay_mode_enabled:
+        return message + gay_mode_text
     return message
 
 class CustomMessageButtonView(discord.ui.View):
     def __init__(self, message: str, user_id: int):
         super().__init__(timeout=None)
-        self.message = apply_coolmode(user_id, message)
+        self.message = gaymode(user_id, message)
 
     @discord.ui.button(label="Send Message", style=discord.ButtonStyle.primary)
     async def send_custom_message(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -41,7 +45,7 @@ class CustomMessageButtonView(discord.ui.View):
 class KokoButtonView(discord.ui.View):
     def __init__(self, message: str, count: int, user_id: int):
         super().__init__(timeout=None)
-        self.message = apply_coolmode(user_id, message)
+        self.message = gaymode(user_id, message)
         self.count = count
 
     @discord.ui.button(label="Send", style=discord.ButtonStyle.primary)
@@ -58,12 +62,14 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
-@bot.tree.command(name="coolmode", description="Toggle cool mode on/off (only for authorized user)")
+@bot.tree.command(name="gaymode", description="Toggle gay mode and optionally customize the text")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-@app_commands.describe(status="on or off")
-async def coolmode_command(interaction: discord.Interaction, status: str):
-    if interaction.user.id != COOL_USER_ID:
+@app_commands.describe(status="on or off", text="Optional custom message (only works when turning ON)")
+async def gaymode_command(interaction: discord.Interaction, status: str, text: str = None):
+    global gay_mode_enabled, gay_mode_text
+
+    if interaction.user.id != PEEKY_ID:
         await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
         return
 
@@ -72,8 +78,14 @@ async def coolmode_command(interaction: discord.Interaction, status: str):
         await interaction.response.send_message("Please choose either 'on' or 'off'.", ephemeral=True)
         return
 
-    cool_mode_enabled[interaction.user.id] = (status == "on")
-    await interaction.response.send_message(f"Cool mode has been turned **{status}**.", ephemeral=True)
+    if status == "on":
+        gay_mode_enabled = True
+        if text:
+            gay_mode_text = " " + text
+        await interaction.response.send_message(f"Gay mode enabled with text: `{gay_mode_text.strip()}`", ephemeral=True)
+    else:
+        gay_mode_enabled = False
+        await interaction.response.send_message("Gay mode has been turned **off**.", ephemeral=True)
 
 @bot.tree.command(name="flood", description="Send a message repeatedly")
 @app_commands.allowed_installs(guilds=True, users=True)
@@ -84,7 +96,7 @@ async def koko_command(interaction: discord.Interaction, text: str, count: int):
         await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
     await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
-    text = apply_coolmode(interaction.user.id, text)
+    text = gaymode(interaction.user.id, text)
     for _ in range(count):
         await interaction.followup.send(text)
 
@@ -105,7 +117,7 @@ async def kokobutton_command(interaction: discord.Interaction, message: str, cou
 @app_commands.describe(text="The message to be shown after")
 async def say_command(interaction: discord.Interaction, text: str):
     await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
-    text = apply_coolmode(interaction.user.id, text)
+    text = gaymode(interaction.user.id, text)
     await interaction.followup.send(text)
 
 @bot.tree.command(name="saybutton", description="Send a custom message with a button")
@@ -115,6 +127,35 @@ async def say_command(interaction: discord.Interaction, text: str):
 async def raidbutton_command(interaction: discord.Interaction, message: str):
     view = CustomMessageButtonView(message, interaction.user.id)
     await interaction.response.send_message("Click the button to send your message.", view=view, ephemeral=True)
+
+@bot.tree.command(name="petpet", description="PetPet someone")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+@app_commands.describe(user="The user to pat")
+async def petpet_command(interaction: discord.Interaction, user: discord.User):
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        avatar_url = user.display_avatar.replace(format="png", size=512).url
+        message = await interaction.followup.send(f"Generating petpet for {user.mention}...", ephemeral=True)
+
+        api_url = f"https://api.obamabot.me/v2/image/petpet?image={avatar_url}"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url) as resp:
+                if resp.status != 200:
+                    await interaction.followup.send("Failed to fetch petpet image.", ephemeral=True)
+                    return
+
+                data = await resp.json()
+                image_url = data.get("url")
+
+                if image_url:
+                    await message.reply(image_url, ephemeral=True)
+                else:
+                    await interaction.followup.send("Something went wrong while generating the image.", ephemeral=True)
+    except Exception:
+        await interaction.followup.send("Something went wrong while generating the image.", ephemeral=True
 
 token = os.getenv("TOKEN")
 if not token:
