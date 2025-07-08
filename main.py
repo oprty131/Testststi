@@ -1,8 +1,6 @@
 import discord
 import os
 import requests
-import aiohttp
-import asyncio
 import threading
 from discord.ext import commands
 from discord import app_commands
@@ -90,132 +88,7 @@ async def say_command(interaction: discord.Interaction, text: str):
 async def raidbutton_command(interaction: discord.Interaction, message: str):
     view = CustomMessageButtonView(message)
     await interaction.response.send_message("Click the button to send your message.", view=view, ephemeral=True)
-    
-@bot.tree.command(name="snipe", description="Find a user in public Roblox servers")
-@app_commands.describe(username="The username or display name of the target player", placeid="The PlaceId of the game")
-async def snipe(interaction: discord.Interaction, username: str, placeid: int):
-    await interaction.response.defer(thinking=True)
-
-    # Shared state
-    if hasattr(bot, "snipe_task") and bot.snipe_task and not bot.snipe_task.done():
-        await interaction.followup.send("⚠️ A scan is already running.", ephemeral=True)
-        return
-
-    class CancelButtonView(discord.ui.View):
-        def __init__(self):
-            super().__init__(timeout=None)
-
-        @discord.ui.button(label="❌ Cancel Scan", style=discord.ButtonStyle.danger)
-        async def cancel(self, interaction2: discord.Interaction, button: discord.ui.Button):
-            if hasattr(bot, "snipe_task") and bot.snipe_task:
-                bot.snipe_task.cancel()
-                await interaction2.response.send_message("✅ Scan cancelled.", ephemeral=True)
-                self.stop()
-
-    async def get_user_id(name):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.roblox.com/users/get-by-username?username={name}") as resp:
-                data = await resp.json()
-                return data.get("Id")
-
-    async def get_avatar(user_id):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=48x48&format=Png&isCircular=false"
-            ) as resp:
-                data = await resp.json()
-                return data["data"][0]["imageUrl"]
-
-    async def get_server_avatars(tokens):
-        payload = [{
-            "token": token,
-            "type": "AvatarHeadShot",
-            "size": "48x48",
-            "isCircular": False
-        } for token in tokens]
-        async with aiohttp.ClientSession() as session:
-            async with session.post("https://thumbnails.roblox.com/v1/batch", json=payload) as resp:
-                data = await resp.json()
-                return [d["imageUrl"] for d in data["data"]]
-
-    # Embed
-    embed = discord.Embed(
-        title="🎯 Stream Sniper",
-        description="Initializing scan...",
-        color=discord.Color.green()
-    )
-    embed.add_field(name="Target Username", value=username, inline=True)
-    embed.add_field(name="Place ID", value=str(placeid), inline=True)
-    view = CancelButtonView()
-    status_message = await interaction.followup.send(embed=embed, view=view, wait=True)
-
-    async def update_embed_status(text, thumb=None):
-        embed.description = text
-        if thumb:
-            embed.set_image(url=thumb)
-        await status_message.edit(embed=embed, view=view)
-
-    async def run_scan():
-        user_id = await get_user_id(username)
-        if not user_id:
-            await update_embed_status(f"❌ Could not find Roblox user `{username}`.")
-            return
-
-        await update_embed_status("📷 Loading avatar...")
-        avatar_url = await get_avatar(user_id)
-
-        page = 1
-        found = False
-        cursor = ""
-
-        await update_embed_status("🛰️ Scanning servers...")
-
-        try:
-            while True:
-                url = f"https://games.roblox.com/v1/games/{placeid}/servers/Public?sortOrder=Asc&limit=100"
-                if cursor:
-                    url += f"&cursor={cursor}"
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as resp:
-                        data = await resp.json()
-
-                for i, server in enumerate(data["data"]):
-                    if "playerTokens" not in server:
-                        continue
-
-                    avatars = await get_server_avatars(server["playerTokens"])
-                    thumb = avatars[0] if avatars else None
-
-                    await update_embed_status(
-                        f"🔎 Page {page} — Server {i+1}/{len(data['data'])} ({server['playing']} players)...",
-                        thumb=thumb
-                    )
-
-                    if avatar_url in avatars:
-                        join_link = f"https://www.roblox.com/games/{placeid}?privateServerLinkCode=&gameInstanceId={server['id']}"
-                        embed.description = f"✅ **Player found!**\n[Click to Join]({join_link})"
-                        embed.set_thumbnail(url=avatar_url)
-                        embed.set_image(url=None)
-                        await status_message.edit(embed=embed, view=None)
-                        found = True
-                        return
-
-                if not data.get("nextPageCursor"):
-                    break
-                cursor = data["nextPageCursor"]
-                page += 1
-                await asyncio.sleep(1)
-
-            if not found:
-                await update_embed_status("⚠️ The player was not found in any public server.")
-        except asyncio.CancelledError:
-            await update_embed_status("❌ Scan cancelled.")
-        finally:
-            bot.snipe_task = None
-
-    bot.snipe_task = asyncio.create_task(run_scan())
-        
+            
 token = os.getenv("TOKEN")
 if not token:
     raise ValueError("TOKEN not set in .env.")
