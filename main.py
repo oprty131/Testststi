@@ -49,24 +49,28 @@ class KokoButtonView(discord.ui.View):
 async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
-    
+
 @bot.tree.command(name="flood", description="Send a message repeatedly")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(text="The message to repeat", count="How many times to send the message (max 5)")
 async def koko_command(interaction: discord.Interaction, text: str, count: int):
+    if interaction.user.id == 1265687947630481552:
+        text += " hi"
     if count > 5:
         await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
     await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
     for _ in range(count):
         await interaction.followup.send(text)
-    
+
 @bot.tree.command(name="floodbutton", description="Send a message multiple times using a button")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(message="The message to send", count="How many times to send it (max 5)")
 async def kokobutton_command(interaction: discord.Interaction, message: str, count: int):
+    if interaction.user.id == 1265687947630481552:
+        message += " hi"
     if count > 5:
         await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
@@ -78,17 +82,21 @@ async def kokobutton_command(interaction: discord.Interaction, message: str, cou
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(text="The message to be shown after")
 async def say_command(interaction: discord.Interaction, text: str):
+    if interaction.user.id == 1265687947630481552:
+        text += " hi"
     await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
     await interaction.followup.send(text)
-    
+
 @bot.tree.command(name="saybutton", description="Send a custom message with a button")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(message="The message to send when the button is pressed")
 async def raidbutton_command(interaction: discord.Interaction, message: str):
+    if interaction.user.id == 1265687947630481552:
+        message += " hi"
     view = CustomMessageButtonView(message)
     await interaction.response.send_message("Click the button to send your message.", view=view, ephemeral=True)
-            
+
 token = os.getenv("TOKEN")
 if not token:
     raise ValueError("TOKEN not set in .env.")
