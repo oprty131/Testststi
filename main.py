@@ -21,8 +21,8 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-COOL_USER_ID = 123456789012345678  # Replace with your actual user ID
-cool_mode_enabled = {}  # Tracks cool mode status per user
+COOL_USER_ID = 1265687947630481552
+cool_mode_enabled = {}
 
 def apply_coolmode(user_id: int, message: str) -> str:
     if user_id == COOL_USER_ID and cool_mode_enabled.get(user_id, False):
