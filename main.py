@@ -3,6 +3,7 @@ import os
 import requests
 import threading
 import aiohttp
+import urllib.parse
 from discord.ext import commands
 from discord import app_commands
 from flask import Flask
@@ -132,30 +133,33 @@ async def raidbutton_command(interaction: discord.Interaction, message: str):
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(user="The user to pat")
-async def petpet_command(interaction: discord.Interaction, user: discord.User):
     await interaction.response.defer(ephemeral=True)
 
     try:
-        avatar_url = user.display_avatar.replace(format="png", size=512).url
+        avatar_url = user.display_avatar.with_format('png').with_size(512).url
+        encoded_url = urllib.parse.quote_plus(avatar_url)
+
         message = await interaction.followup.send(f"Generating petpet for {user.mention}...", ephemeral=True)
 
-        api_url = f"https://api.obamabot.me/v2/image/petpet?image={avatar_url}"
+        api_url = f"https://api.obamabot.me/v2/image/petpet?image={encoded_url}"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as resp:
                 if resp.status != 200:
-                    await interaction.followup.send("Failed to fetch petpet image.", ephemeral=True)
+                    await interaction.followup.send(f"Failed to fetch petpet image. Status: {resp.status}", ephemeral=True)
                     return
 
                 data = await resp.json()
-                image_url = data.get("url")
+                # Send the entire JSON response as a message, ephemeral
+                await interaction.followup.send(f"API response:```json\n{data}```", ephemeral=True)
 
+                image_url = data.get("url")
                 if image_url:
                     await message.reply(image_url, ephemeral=True)
                 else:
                     await interaction.followup.send("Something went wrong while generating the image.", ephemeral=True)
-    except Exception:
-        await interaction.followup.send("Something went wrong while generating the image.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"Exception occurred: {e}", ephemeral=True)
 
 token = os.getenv("TOKEN")
 if not token:
