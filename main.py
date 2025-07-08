@@ -89,6 +89,87 @@ async def raidbutton_command(interaction: discord.Interaction, message: str):
     view = CustomMessageButtonView(message)
     await interaction.response.send_message("Click the button to send your message.", view=view, ephemeral=True)
     
+def get_user_id(username):
+    if username.isdigit():
+        return int(username)
+    url = "https://users.roblox.com/v1/usernames/users"
+    response = requests.post(url, json={"usernames": [username]})
+    data = response.json()
+    if data['data']:
+        return data['data'][0]['id']
+    return None
+
+def get_avatar_url(user_id):
+    url = f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=48x48&format=Png&isCircular=false"
+    response = requests.get(url)
+    data = response.json()
+    if data['data']:
+        return data['data'][0]['imageUrl']
+    return None
+
+def get_avatars_by_tokens(tokens):
+    url = "https://thumbnails.roblox.com/v1/batch"
+    payload = [{
+        "token": token,
+        "type": "AvatarHeadShot",
+        "size": "48x48",
+        "isCircular": False
+    } for token in tokens]
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=payload, headers=headers)
+    data = response.json()
+    return [item['imageUrl'] for item in data['data']]
+
+def scan_servers(place_id, target_avatar_url, min_players):
+    cursor = ""
+    while True:
+        url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?sortOrder=Asc&limit=100"
+        if cursor:
+            url += f"&cursor={cursor}"
+        response = requests.get(url)
+        if response.status_code != 200:
+            break
+        data = response.json()
+        for server in data['data']:
+            if server['playing'] < min_players:
+                continue
+            tokens = server.get('playerTokens', [])
+            if not tokens:
+                continue
+            avatars = get_avatars_by_tokens(tokens)
+            if target_avatar_url in avatars:
+                return server
+        cursor = data.get('nextPageCursor')
+        if not cursor:
+            break
+    return None
+    
+@bot.tree.command(name="snipe", description="Scan Roblox servers to find the user")
+@app_commands.describe(username="Target Roblox username", place_id="Roblox place ID", min_players="Minimum players in the server")
+async def snipe_command(interaction: discord.Interaction, username: str, place_id: str, min_players: int = 1):
+    await interaction.response.defer(thinking=True)
+
+    user_id = get_user_id(username)
+    if not user_id:
+        await interaction.followup.send(f"❌ Could not find user `{username}`.")
+        return
+
+    avatar_url = get_avatar_url(user_id)
+    if not avatar_url:
+        await interaction.followup.send(f"❌ Could not get avatar for `{username}`.")
+        return
+
+    server = scan_servers(place_id, avatar_url, min_players)
+    if server:
+        join_link = f"https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={server['id']}"
+        await interaction.followup.send(
+            f"✅ **Player found!**\n"
+            f"👥 Players: `{server['playing']}`\n"
+            f"🔗 [Join Server]({join_link})"
+        )
+    else:
+        await interaction.followup.send("❌ Player not found in any public server.")
+        
 token = os.getenv("TOKEN")
 if not token:
     raise ValueError("TOKEN not set in .env.")
