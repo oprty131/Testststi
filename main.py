@@ -155,7 +155,7 @@ async def petpet_command(interaction: discord.Interaction, user: discord.User):
                 else:
                     await interaction.followup.send("Something went wrong while generating the image.", ephemeral=True)
     except Exception:
-        await interaction.followup.send("Something went wrong while generating the image.", ephemeral=True
+        await interaction.followup.send("Something went wrong while generating the image.", ephemeral=True)
 
 token = os.getenv("TOKEN")
 if not token:
