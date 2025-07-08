@@ -3,7 +3,6 @@ import os
 import requests
 import threading
 import aiohttp
-import urllib.parse
 from discord.ext import commands
 from discord import app_commands
 from flask import Flask
@@ -134,7 +133,7 @@ async def raidbutton_command(interaction: discord.Interaction, message: str):
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(user="The user to pat")
 async def petpet_command(interaction: discord.Interaction, user: discord.User):
-    await interaction.response.defer()
+    await interaction.response.send_message("🔄 Generating image...", ephemeral=True)
 
     avatar_url = user.display_avatar.with_format("png").with_size(256).url
     api_url = f"https://api.obamabot.me/v2/image/petpet?image={avatar_url}"
@@ -142,17 +141,15 @@ async def petpet_command(interaction: discord.Interaction, user: discord.User):
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url) as resp:
             if resp.status != 200:
-                await interaction.followup.send("❌ Failed to generate petpet image.")
+                await interaction.followup.send("❌ Failed to generate petpet image.", ephemeral=True)
                 return
 
             data = await resp.json()
             if data.get("error") or "url" not in data:
-                await interaction.followup.send("❌ Error in response from API.")
+                await interaction.followup.send("❌ Error in response from API.", ephemeral=True)
                 return
 
-            petpet_url = data["url"]
-            await interaction.followup.send(f"👋 Petting {user.mention}!\n{petpet_url}")
-
+            await interaction.followup.send(data["url"])
 
 token = os.getenv("TOKEN")
 if not token:
