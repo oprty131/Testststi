@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            background-color: #36393f;
+            color: #dcddde;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 20px;
+        }
+        .message {
+            display: flex;
+            align-items: flex-start;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 12px;
+        }
+        .msg-content {
+            display: flex;
+            flex-direction: column;
+        }
+        .msg-username {
+            font-weight: bold;
+            color: #fff;
+            font-size: 14px;
+        }
+        .msg-timestamp {
+            font-size: 12px;
+            color: #72767d;
+            margin-left: 6px;
+        }
+        .msg-text {
+            font-size: 14px;
+            color: #dcddde;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="message">
+        <img class="avatar" src="{{ avatar }}">
+        <div class="msg-content">
+            <div>
+                <span class="msg-username">{{ username }}</span>
+                <span class="msg-timestamp">{{ timestamp }}</span>
+            </div>
+            <div class="msg-text">{{ message }}</div>
+        </div>
+    </div>
+</body>
+</html>
