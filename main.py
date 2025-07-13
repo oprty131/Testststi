@@ -3,8 +3,6 @@ import os
 import requests
 import threading
 import aiohttp
-import random
-from datetime import datetime, timedelta
 from discord.ext import commands
 from discord import app_commands
 from flask import Flask
@@ -152,41 +150,6 @@ async def petpet_command(interaction: discord.Interaction, user: discord.User):
                 return
 
             await interaction.followup.send(data["url"])
-
-@bot.tree.command(name="fakemessage", description="Generate a fake message image of a user saying something.")
-@app_commands.describe(user="The user to fake the message for", message="The fake message content")
-async def fakemessage_command(interaction: discord.Interaction, user: discord.User, message: str):
-    await interaction.response.send_message("🔄 Generating fake message...", ephemeral=True)
-
-    # Generate a random timestamp within the past 30 days
-    days_ago = random.randint(0, 30)
-    time_offset = timedelta(days=days_ago, hours=random.randint(0, 23), minutes=random.randint(0, 59))
-    fake_timestamp = (datetime.utcnow() - time_offset).strftime("%Y-%m-%d %H:%M:%S")
-
-    avatar_url = user.display_avatar.with_format("png").with_size(512).url
-
-    api_url = "https://nekobot.xyz/api/imagegen"
-    params = {
-        "type": "fakequote",
-        "username": user.name,
-        "avatar": avatar_url,
-        "message": message
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(api_url, params=params) as resp:
-            if resp.status != 200:
-                await interaction.followup.send("❌ Failed to generate fake message.", ephemeral=True)
-                return
-            data = await resp.json()
-            if not data.get("message"):
-                await interaction.followup.send("❌ API did not return a valid image.", ephemeral=True)
-                return
-
-            # Send the generated image
-            embed = discord.Embed(title=f"Fake message from {user.name}", description=f"🕒 {fake_timestamp}")
-            embed.set_image(url=data["message"])
-            await interaction.followup.send(embed=embed)
 
 token = os.getenv("TOKEN")
 if not token:
