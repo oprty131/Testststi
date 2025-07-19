@@ -95,7 +95,7 @@ async def koko_command(interaction: discord.Interaction, text: str, count: int):
     if count > 5:
         await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
-    await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
+    await interaction.response.send_message("https://discord.gg/jwYqu66bqm", ephemeral=True)
     text = gaymode(interaction.user.id, text)
     for _ in range(count):
         await interaction.followup.send(text)
@@ -116,7 +116,7 @@ async def kokobutton_command(interaction: discord.Interaction, message: str, cou
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 @app_commands.describe(text="The message to be shown after")
 async def say_command(interaction: discord.Interaction, text: str):
-    await interaction.response.send_message("https://discord.gg/64wwVMagmY", ephemeral=True)
+    await interaction.response.send_message("https://discord.gg/jwYqu66bqm", ephemeral=True)
     text = gaymode(interaction.user.id, text)
     await interaction.followup.send(text)
 
