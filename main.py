@@ -5,7 +5,7 @@ import threading
 import aiohttp
 from discord.ext import commands
 from discord import app_commands
-from flask import Flask
+from flask import Flask, request, render_template, url_for
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import asyncio
