@@ -7,6 +7,7 @@ from discord.ext import commands
 from discord import app_commands
 from flask import Flask
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
 import asyncio
 
 load_dotenv()
@@ -15,6 +16,21 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return "Bot is alive!", 200
+    
+UPLOAD_FOLDER = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+@app.route('/uploa', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'POST':
+        file = request.files['image']
+        if file:
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            image_url = url_for('static', filename=f'uploads/{filename}')
+            return render_template('upload.html', image_url=image_url)
+    return render_template('upload.html', image_url=None)
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
