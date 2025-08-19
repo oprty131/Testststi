@@ -16,7 +16,8 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return "Bot is alive!", 200
-    
+
+os.makedirs('static/uploads', exist_ok=True)
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
