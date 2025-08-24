@@ -63,14 +63,20 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
-@bot.tree.command(name="snipe", description="Find Roblox user by thumbnail")
+@bot.tree.command(name="snipe_thumbnail_embed_edit", description="Find Roblox user and update embed as servers are found")
 @app_commands.describe(place_id="Roblox game Place ID", target_user_id="Target Roblox user ID")
-async def snipe(interaction: discord.Interaction, place_id: int, target_user_id: int):
+async def snipe_thumbnail_embed_edit(interaction: discord.Interaction, place_id: int, target_user_id: int):
     await interaction.response.send_message(f"🔍 Searching for user `{target_user_id}` in place `{place_id}`...", ephemeral=True)
+    user_data = requests.get(f"https://users.roblox.com/v1/users/{target_user_id}").json()
+    username = user_data.get("name", "Unknown")
     target_thumb = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={target_user_id}&size=150x150&format=Png&isCircular=false").json()["data"][0]["imageUrl"]
     cursor = ""
-    found = {}
     headers = {"User-Agent": "DiscordBot/1.0"}
+    found_servers = []
+
+    embed = discord.Embed(title=f"{target_user_id} | {username}", description=f"Place ID: {place_id}\nSearching servers...", color=discord.Color.green())
+    embed.set_thumbnail(url=target_thumb)
+    msg = await interaction.followup.send(embed=embed, ephemeral=False)
 
     while True:
         url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
@@ -82,24 +88,32 @@ async def snipe(interaction: discord.Interaction, place_id: int, target_user_id:
         if not servers:
             break
 
+        updated = False
         for s in servers:
             tokens = [{"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": s["id"]} for t in s.get("playerTokens", [])]
             if not tokens:
                 continue
             thumb_data = requests.post("https://thumbnails.roblox.com/v1/batch", headers={"Content-Type": "application/json"}, json=tokens).json()
             for t in thumb_data.get("data", []):
-                if t.get("imageUrl") == target_thumb:
-                    found[s["id"]] = {"users": [target_user_id], "playerCount": f"{s['playing']}/{s['maxPlayers']}"}
+                if t.get("imageUrl") == target_thumb and s["id"] not in found_servers:
+                    found_servers.append(s["id"])
+                    updated = True
+
+        if updated:
+            desc = f"Place ID: {place_id}\nFound in servers:\n"
+            for sid in found_servers:
+                desc += f"Server ID: {sid}\n"
+            embed.description = desc
+            await msg.edit(embed=embed)
+
         cursor = data.get("nextPageCursor")
         if not cursor:
             break
         await asyncio.sleep(1.5)
 
-    if found:
-        for sid, info in found.items():
-            await interaction.followup.send(f"✅ Target found! Server ID: `{sid}` | Players: {info['playerCount']} | Join link: https://roblox.com/games/{place_id}/{sid}", ephemeral=False)
-    else:
-        await interaction.followup.send("❌ Target not found in currently listed servers.", ephemeral=True)
+    if not found_servers:
+        embed.description = f"Place ID: {place_id}\n❌ Target not found in currently listed servers."
+        await msg.edit(embed=embed)
 
 @bot.tree.command(name="gaymode", description="Toggle gay mode and optionally customize the text")
 @app_commands.allowed_installs(guilds=True, users=True)
