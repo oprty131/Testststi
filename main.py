@@ -3,7 +3,6 @@ import os
 import requests
 import threading
 import aiohttp
-import asyncio
 from discord.ext import commands
 from discord import app_commands
 from flask import Flask
@@ -62,66 +61,6 @@ class KokoButtonView(discord.ui.View):
 async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
-    
-@bot.tree.command(name="snipe", description="Search Roblox servers for a player by thumbnail")
-@app_commands.describe(place_id="Roblox game Place ID", target_user_id="The target user's ID to find by thumbnail")
-async def snipe_thumbnail(interaction: discord.Interaction, place_id: int, target_user_id: int):
-    await interaction.response.send_message(f"🔍 Searching for user `{target_user_id}` in servers of place `{place_id}`...", ephemeral=True)
-
-    found = False
-    cursor = None
-    headers = {"User-Agent": "DiscordBot/1.0"}
-
-    # Fetch the target user's headshot thumbnail URL
-    thumb_response = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={target_user_id}&size=48x48&format=Png&isCircular=false")
-    if thumb_response.status_code != 200:
-        await interaction.followup.send("❌ Failed to fetch target thumbnail.", ephemeral=True)
-        return
-    target_thumb_url = thumb_response.json()["data"][0]["imageUrl"]
-
-    while True:
-        # Fetch a page of servers
-        url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
-        if cursor:
-            url += f"&cursor={cursor}"
-
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            await interaction.followup.send("❌ Failed to fetch server list.", ephemeral=True)
-            return
-
-        data = response.json()
-        servers = data.get("data", [])
-
-        for server in servers:
-            # Get all players in the server
-            player_ids = [player.get("id") for player in server.get("players", []) if player.get("id")]
-            if not player_ids:
-                continue
-
-            # Fetch headshot thumbnails for these players
-            ids_str = ",".join(map(str, player_ids))
-            thumbs_response = requests.get(
-                f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={ids_str}&size=48x48&format=Png&isCircular=false"
-            )
-            if thumbs_response.status_code != 200:
-                continue
-            thumbs_data = thumbs_response.json().get("data", [])
-
-            # Compare thumbnails
-            for p in thumbs_data:
-                if p.get("imageUrl") == target_thumb_url:
-                    server_id = server.get("id")
-                    await interaction.followup.send(f"✅ Target found in server ID: `{server_id}`!", ephemeral=False)
-                    return
-
-        # Next page
-        cursor = data.get("nextPageCursor")
-        if not cursor:
-            break
-        await asyncio.sleep(1.5)  # avoid rate limit
-
-    await interaction.followup.send("❌ Target not found in currently listed servers.", ephemeral=True)
     
 @bot.tree.command(name="gaymode", description="Toggle gay mode and optionally customize the text")
 @app_commands.allowed_installs(guilds=True, users=True)
