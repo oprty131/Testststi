@@ -66,14 +66,6 @@ async def on_ready():
 
 cooldowns = {}
 
-import asyncio
-import time
-import requests
-import discord
-from discord import app_commands
-
-cooldowns = {}
-
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
 @app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
