@@ -63,13 +63,8 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
-import asyncio
-import requests
-import discord
-from discord import app_commands
-
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
-@app_commands.describe(UserId="Target Roblox User ID", PlaceId="Roblox game Place ID")
+@app_commands.describe(UserId="UserId", PlaceId="PlaceId")
 async def snipe(interaction: discord.Interaction, UserId: int, PlaceId: int):
     await interaction.response.send_message(f"🔍 Searching for user `{UserId}` in place `{PlaceId}`...", ephemeral=True)
 
