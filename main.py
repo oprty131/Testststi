@@ -3,6 +3,7 @@ import os
 import requests
 import threading
 import aiohttp
+import asyncio
 from discord.ext import commands
 from discord import app_commands
 from flask import Flask
@@ -61,7 +62,45 @@ class KokoButtonView(discord.ui.View):
 async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
-    
+
+@bot.tree.command(name="snipe", description="Find Roblox user by thumbnail")
+@app_commands.describe(place_id="Roblox game Place ID", target_user_id="Target Roblox user ID")
+async def snipe_thumbnail(interaction: discord.Interaction, place_id: int, target_user_id: int):
+    await interaction.response.send_message(f"🔍 Searching for user `{target_user_id}` in place `{place_id}`...", ephemeral=True)
+    target_thumb = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={target_user_id}&size=150x150&format=Png&isCircular=false").json()["data"][0]["imageUrl"]
+    cursor = ""
+    found = {}
+    headers = {"User-Agent": "DiscordBot/1.0"}
+
+    while True:
+        url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
+        if cursor:
+            url += f"&cursor={cursor}"
+        r = requests.get(url, headers=headers)
+        data = r.json()
+        servers = data.get("data", [])
+        if not servers:
+            break
+
+        for s in servers:
+            tokens = [{"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": s["id"]} for t in s.get("playerTokens", [])]
+            if not tokens:
+                continue
+            thumb_data = requests.post("https://thumbnails.roblox.com/v1/batch", headers={"Content-Type": "application/json"}, json=tokens).json()
+            for t in thumb_data.get("data", []):
+                if t.get("imageUrl") == target_thumb:
+                    found[s["id"]] = {"users": [target_user_id], "playerCount": f"{s['playing']}/{s['maxPlayers']}"}
+        cursor = data.get("nextPageCursor")
+        if not cursor:
+            break
+        await asyncio.sleep(1.5)
+
+    if found:
+        for sid, info in found.items():
+            await interaction.followup.send(f"✅ Target found! Server ID: `{sid}` | Players: {info['playerCount']} | Join link: https://roblox.com/games/{place_id}/{sid}", ephemeral=False)
+    else:
+        await interaction.followup.send("❌ Target not found in currently listed servers.", ephemeral=True)
+
 @bot.tree.command(name="gaymode", description="Toggle gay mode and optionally customize the text")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
