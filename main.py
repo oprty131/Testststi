@@ -63,30 +63,35 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
+import asyncio
+import requests
+import discord
+from discord import app_commands
+
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
-@app_commands.describe(UserId="UserId", PlaceId="PlaceId")
-async def snipe(interaction: discord.Interaction, UserId: int, PlaceId: int):
-    await interaction.response.send_message(f"🔍 Searching for user `{UserId}` in place `{PlaceId}`...", ephemeral=True)
+@app_commands.describe(user_id="UserId", place_id="PlaceId")
+async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
+    await interaction.response.send_message(f"🔍 Searching for user `{user_id}` in place `{place_id}`...", ephemeral=True)
 
-    user_data = requests.get(f"https://users.roblox.com/v1/users/{UserId}").json()
+    user_data = requests.get(f"https://users.roblox.com/v1/users/{user_id}").json()
     username = user_data.get("name", "Unknown")
-    target_thumb = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={UserId}&size=150x150&format=Png&isCircular=false").json()["data"][0]["imageUrl"]
+    target_thumb = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false").json()["data"][0]["imageUrl"]
 
-    place_data = requests.get(f"https://games.roblox.com/v1/games?universeIds={PlaceId}").json()
+    place_data = requests.get(f"https://games.roblox.com/v1/games?universeIds={place_id}").json()
     game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
-    game_link = f"https://roblox.com/games/{PlaceId}"
+    game_link = f"https://roblox.com/games/{place_id}"
     game_name = f"[{game_name_text}]({game_link})"
 
     cursor = ""
     headers = {"User-Agent": "DiscordBot/1.0"}
     found_servers = []
 
-    embed = discord.Embed(title=f"{UserId} | {username}", description=f"Game: {game_name}\nPlace ID: {PlaceId}\nSearching servers...", color=discord.Color.green())
+    embed = discord.Embed(title=f"{user_id} | {username}", description=f"Game: {game_name}\nPlace ID: {place_id}\nSearching servers...", color=discord.Color.green())
     embed.set_thumbnail(url=target_thumb)
     msg = await interaction.followup.send(embed=embed, ephemeral=False)
 
     while True:
-        url = f"https://games.roblox.com/v1/games/{PlaceId}/servers/Public?limit=100"
+        url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
         if cursor:
             url += f"&cursor={cursor}"
 
@@ -108,9 +113,9 @@ async def snipe(interaction: discord.Interaction, UserId: int, PlaceId: int):
                     updated = True
 
         if updated:
-            desc = f"Game: {game_name}\nPlace ID: {PlaceId}\nFound in servers:\n"
+            desc = f"Game: {game_name}\nPlace ID: {place_id}\nFound in servers:\n"
             for sid in found_servers:
-                desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={PlaceId}&gameInstanceId={sid})\n"
+                desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={sid})\n"
             embed.description = desc
             await msg.edit(embed=embed)
 
@@ -120,7 +125,7 @@ async def snipe(interaction: discord.Interaction, UserId: int, PlaceId: int):
         await asyncio.sleep(1.5)
 
     if not found_servers:
-        embed.description = f"Game: {game_name}\nPlace ID: {PlaceId}\n❌ Target not found in currently listed servers."
+        embed.description = f"Game: {game_name}\nPlace ID: {place_id}\n❌ Target not found in currently listed servers."
         await msg.edit(embed=embed)
 
 @bot.tree.command(name="gaymode", description="Toggle gay mode and optionally customize the text")
