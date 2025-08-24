@@ -66,16 +66,28 @@ async def on_ready():
 
 cooldowns = {}
 
+import asyncio
+import time
+import requests
+import discord
+from discord import app_commands
+
+cooldowns = {}
+
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
-@app_commands.describe(user_id="UserId", place_id="PlaceId")
+@app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     user = interaction.user.id
     now = time.time()
 
     if user in cooldowns and now - cooldowns[user] < 300:
-        remaining = int(300 - (now - cooldowns[user]))
-        await interaction.response.send_message(f"⏳ Please wait {remaining} seconds before using this command again.", ephemeral=True)
-        return
+    remaining = 300 - (now - cooldowns[user])
+    minutes = round(remaining / 60, 1)
+    await interaction.response.send_message(
+        f"⏳ Please wait {minutes} minutes before using this command again.",
+        ephemeral=True
+    )
+    return
 
     cooldowns[user] = now
 
@@ -83,7 +95,9 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
 
     user_data = requests.get(f"https://users.roblox.com/v1/users/{user_id}").json()
     username = user_data.get("name", "Unknown")
-    target_thumb = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false").json()["data"][0]["imageUrl"]
+    target_thumb = requests.get(
+        f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false"
+    ).json()["data"][0]["imageUrl"]
 
     place_data = requests.get(f"https://games.roblox.com/v1/games?universeIds={place_id}").json()
     game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
@@ -94,7 +108,11 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     headers = {"User-Agent": "DiscordBot/1.0"}
     found_servers = []
 
-    embed = discord.Embed(title=f"{user_id} | {username}", description=f"Game: {game_name}\nPlace ID: {place_id}\nSearching servers...", color=discord.Color.green())
+    embed = discord.Embed(
+        title=f"{user_id} | {username}",
+        description=f"Game: {game_name}\nPlace ID: {place_id}\nSearching servers...",
+        color=discord.Color.green()
+    )
     embed.set_thumbnail(url=target_thumb)
     msg = await interaction.followup.send(embed=embed, ephemeral=False)
 
@@ -114,7 +132,11 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
             tokens = [{"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": s["id"]} for t in s.get("playerTokens", [])]
             if not tokens:
                 continue
-            thumb_data = requests.post("https://thumbnails.roblox.com/v1/batch", headers={"Content-Type": "application/json"}, json=tokens).json()
+            thumb_data = requests.post(
+                "https://thumbnails.roblox.com/v1/batch",
+                headers={"Content-Type": "application/json"},
+                json=tokens
+            ).json()
             for t in thumb_data.get("data", []):
                 if t.get("imageUrl") == target_thumb and s["id"] not in found_servers:
                     found_servers.append(s["id"])
