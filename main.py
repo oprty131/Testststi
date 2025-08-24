@@ -73,13 +73,13 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     now = time.time()
 
     if user in cooldowns and now - cooldowns[user] < 300:
-    remaining = 300 - (now - cooldowns[user])
-    minutes = round(remaining / 60, 1)
-    await interaction.response.send_message(
-        f"⏳ Please wait {minutes} minutes before using this command again.",
-        ephemeral=True
-    )
-    return
+        remaining = 300 - (now - cooldowns[user])
+        minutes = round(remaining / 60, 1)
+        await interaction.response.send_message(
+            f"⏳ Please wait {minutes} minutes before using this command again.",
+            ephemeral=True
+        )
+        return
 
     cooldowns[user] = now
 
