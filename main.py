@@ -63,14 +63,21 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
-import asyncio
-import requests
-import discord
-from discord import app_commands
+cooldowns = {}
 
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
 @app_commands.describe(user_id="UserId", place_id="PlaceId")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
+    user = interaction.user.id
+    now = time.time()
+
+    if user in cooldowns and now - cooldowns[user] < 300:
+        remaining = int(300 - (now - cooldowns[user]))
+        await interaction.response.send_message(f"⏳ Please wait {remaining} seconds before using this command again.", ephemeral=True)
+        return
+
+    cooldowns[user] = now
+
     await interaction.response.send_message(f"🔍 Searching for user `{user_id}` in place `{place_id}`...", ephemeral=True)
 
     user_data = requests.get(f"https://users.roblox.com/v1/users/{user_id}").json()
