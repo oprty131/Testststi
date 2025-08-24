@@ -65,7 +65,7 @@ async def on_ready():
 
 @bot.tree.command(name="snipe", description="Find Roblox user by thumbnail")
 @app_commands.describe(place_id="Roblox game Place ID", target_user_id="Target Roblox user ID")
-async def snipe_thumbnail(interaction: discord.Interaction, place_id: int, target_user_id: int):
+async def snipe(interaction: discord.Interaction, place_id: int, target_user_id: int):
     await interaction.response.send_message(f"🔍 Searching for user `{target_user_id}` in place `{place_id}`...", ephemeral=True)
     target_thumb = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={target_user_id}&size=150x150&format=Png&isCircular=false").json()["data"][0]["imageUrl"]
     cursor = ""
