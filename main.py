@@ -32,10 +32,48 @@ gay_mode_text = " i'm gay"
 
 session = None
 
+gay_mode_enabled = False
+gay_mode_target_id = None
+gay_mode_text = " i'm gay"
+
 def apply_gaymode(user_id: int, message: str) -> str:
-    if user_id == GAY_USER_ID and gay_mode_enabled:
+    if gay_mode_enabled and gay_mode_target_id and user_id == gay_mode_target_id:
         return message + gay_mode_text
     return message
+
+@bot.tree.command(name="gaymode", description="Toggle gay mode and optionally customize the text")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+@app_commands.describe(
+    target="The user to apply gaymode to",
+    status="on or off",
+    text="Custom message (Optional)"
+)
+async def gaymode_command(interaction: discord.Interaction, target: discord.User, status: str, text: str = None):
+    global gay_mode_enabled, gay_mode_text, gay_mode_target_id
+
+    if interaction.user.id != PEEKY_ID:
+        await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+        return
+
+    status = status.lower()
+    if status not in ["on", "off"]:
+        await interaction.response.send_message("Please choose either 'on' or 'off'.", ephemeral=True)
+        return
+
+    if status == "on":
+        gay_mode_enabled = True
+        gay_mode_target_id = target.id
+        if text:
+            gay_mode_text = " " + text
+        await interaction.response.send_message(
+            f"Gay mode enabled for {target.name} with text: `{gay_mode_text.strip()}`",
+            ephemeral=True
+        )
+    else:
+        gay_mode_enabled = False
+        gay_mode_target_id = None
+        await interaction.response.send_message("Gay mode has been turned **off**.", ephemeral=True)
 
 class CustomMessageButtonView(discord.ui.View):
     def __init__(self, message: str, user_id: int):
