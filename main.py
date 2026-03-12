@@ -25,10 +25,6 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 PEEKY_ID = 1265687947630481552
-GAY_USER_ID = 1391486635962798242
-
-gay_mode_enabled = False
-gay_mode_text = " i'm gay"
 
 session = None
 
@@ -210,33 +206,6 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     if not found_servers:
         embed.description = f"Game: {game_name}\nPlace ID: {place_id}\n❌ Target not found in currently listed servers."
         await msg.edit(embed=embed)
-
-@bot.tree.command(name="gaymode", description="Toggle gay mode and optionally customize the text")
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-@app_commands.describe(status="on or off", text="Optional custom message (only works when turning ON)")
-async def gaymode_command(interaction: discord.Interaction, status: str, text: str = None):
-    global gay_mode_enabled, gay_mode_text
-
-    if interaction.user.id != PEEKY_ID:
-        await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
-        return
-
-    status = status.lower()
-
-    if status not in ["on", "off"]:
-        await interaction.response.send_message("Please choose either 'on' or 'off'.", ephemeral=True)
-        return
-
-    if status == "on":
-        gay_mode_enabled = True
-        if text:
-            gay_mode_text = " " + text
-
-        await interaction.response.send_message(f"Gay mode enabled with text: `{gay_mode_text.strip()}`", ephemeral=True)
-    else:
-        gay_mode_enabled = False
-        await interaction.response.send_message("Gay mode has been turned **off**.", ephemeral=True)
 
 @bot.tree.command(name="flood", description="Send a message repeatedly")
 @app_commands.allowed_installs(guilds=True, users=True)
