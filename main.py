@@ -103,6 +103,9 @@ async def on_ready():
     session = aiohttp.ClientSession()
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
+async def on_close():
+    if session:
+        await session.close()
 
 cooldowns = {}
 
@@ -122,6 +125,7 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
         return
 
     cooldowns[user] = now
+
     await interaction.response.send_message(
         f"🔍 Searching for user `{user_id}` in place `{place_id}`...",
         ephemeral=True
@@ -130,19 +134,23 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     try:
         async with session.get(f"https://users.roblox.com/v1/users/{user_id}") as r:
             user_data = await r.json()
+
         username = user_data.get("name", "Unknown")
 
         async with session.get(
             f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false"
         ) as r:
             thumb_json = await r.json()
+
         target_thumb = thumb_json["data"][0]["imageUrl"]
 
         async with session.get(f"https://games.roblox.com/v1/games?universeIds={place_id}") as r:
             place_data = await r.json()
+
         game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
         game_link = f"https://roblox.com/games/{place_id}"
         game_name = f"[{game_name_text}]({game_link})"
+
     except Exception:
         await interaction.followup.send("❌ Failed to fetch Roblox data.", ephemeral=True)
         return
@@ -152,25 +160,38 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
         description=f"Game: {game_name}\nPlace ID: {place_id}\nSearching servers...",
         color=discord.Color.green()
     )
+
     embed.set_thumbnail(url=target_thumb)
+
     msg = await interaction.followup.send(embed=embed, ephemeral=False)
 
     found_servers = []
     cursor = ""
     headers = {"User-Agent": "DiscordBot/1.0"}
 
+    semaphore = asyncio.Semaphore(10)
+
     async def check_server(server):
-        tokens = [
-            {"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": server["id"]}
-            for t in server.get("playerTokens", [])
-        ]
-        if not tokens:
-            return None
-        async with session.post("https://thumbnails.roblox.com/v1/batch", json=tokens) as r:
-            data = await r.json()
-        for t in data.get("data", []):
-            if target_thumb in t.get("imageUrl", ""):
-                return server["id"]
+        async with semaphore:
+            tokens = [
+                {"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": server["id"]}
+                for t in server.get("playerTokens", [])
+            ]
+
+            if not tokens:
+                return None
+
+            async with session.post(
+                "https://thumbnails.roblox.com/v1/batch",
+                json=tokens
+            ) as r:
+
+                data = await r.json()
+
+            for t in data.get("data", []):
+                if target_thumb in t.get("imageUrl", ""):
+                    return server["id"]
+
         return None
 
     while True:
@@ -182,23 +203,27 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
             data = await r.json()
 
         servers = data.get("data", [])
+
         if not servers:
             break
 
         tasks = [check_server(s) for s in servers]
         results = await asyncio.gather(*tasks)
+
         for server_id in results:
             if server_id and server_id not in found_servers:
                 found_servers.append(server_id)
 
         if found_servers:
             desc = f"Game: {game_name}\nPlace ID: {place_id}\nFound in servers:\n"
+
             for sid in found_servers:
                 desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={sid})\n"
             embed.description = desc
             await msg.edit(embed=embed)
 
         cursor = data.get("nextPageCursor")
+
         if not cursor:
             break
         await asyncio.sleep(0.5)
