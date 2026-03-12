@@ -107,24 +107,10 @@ async def on_close():
     if session:
         await session.close()
 
-cooldowns = {}
-
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
 @app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     user = interaction.user.id
-    now = time.time()
-
-    if user in cooldowns and now - cooldowns[user] < 300:
-        remaining = 300 - (now - cooldowns[user])
-        minutes = round(remaining / 60, 1)
-        await interaction.response.send_message(
-            f"⏳ Please wait {minutes} minutes before using this command again.",
-            ephemeral=True
-        )
-        return
-
-    cooldowns[user] = now
 
     await interaction.response.send_message(
         f"🔍 Searching for user `{user_id}` in place `{place_id}`...",
