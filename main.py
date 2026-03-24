@@ -130,7 +130,12 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
 
         target_thumb = thumb_json["data"][0]["imageUrl"]
 
-        async with session.get(f"https://games.roblox.com/v1/games?universeIds={place_id}") as r:
+        async with session.get(f"https://apis.roblox.com/universes/v1/places/{place_id}/universe") as r:
+            uni_data = await r.json()
+
+        universe_id = uni_data.get("universeId")
+
+        async with session.get(f"https://games.roblox.com/v1/games?universeIds={universe_id}") as r:
             place_data = await r.json()
 
         game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
