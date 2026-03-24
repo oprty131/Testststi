@@ -111,116 +111,68 @@ async def on_close():
 @app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     user = interaction.user.id
+    await interaction.response.send_message(f"🔍 Searching for user `{user_id}` in place `{place_id}`...", ephemeral=True)
 
-    await interaction.response.send_message(
-        f"🔍 Searching for user `{user_id}` in place `{place_id}`...",
-        ephemeral=True
-    )
+    user_data = requests.get(f"https://users.roblox.com/v1/users/{user_id}").json()
+    username = user_data.get("name", "Unknown")
+    target_thumb = requests.get(
+        f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false"
+    ).json()["data"][0]["imageUrl"]
 
-    try:
-        async with session.get(f"https://users.roblox.com/v1/users/{user_id}") as r:
-            user_data = await r.json()
+    place_data = requests.get(f"https://games.roblox.com/v1/games?universeIds={place_id}").json()
+    game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
+    game_link = f"https://roblox.com/games/{place_id}"
+    game_name = f"[{game_name_text}]({game_link})"
 
-        username = user_data.get("name", "Unknown")
-
-        async with session.get(
-            f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false"
-        ) as r:
-            thumb_json = await r.json()
-
-        target_thumb = thumb_json["data"][0]["imageUrl"]
-
-        async with session.get(f"https://apis.roblox.com/universes/v1/places/{place_id}/universe") as r:
-            uni_data = await r.json()
-
-        universe_id = uni_data.get("universeId")
-
-        async with session.get(f"https://games.roblox.com/v1/games?universeIds={universe_id}") as r:
-            place_data = await r.json()
-
-        game_name_text = place_data.get("data", [{}])[0].get("name", "Unknown Game")
-        game_link = f"https://roblox.com/games/{place_id}"
-        game_name = f"[{game_name_text}]({game_link})"
-
-    except Exception:
-        await interaction.followup.send("❌ Failed to fetch Roblox data.", ephemeral=True)
-        return
+    cursor = ""
+    headers = {"User-Agent": "DiscordBot/1.0"}
+    found_servers = []
 
     embed = discord.Embed(
         title=f"{user_id} | {username}",
         description=f"Game: {game_name}\nPlace ID: {place_id}\nSearching servers...",
         color=discord.Color.green()
     )
-
     embed.set_thumbnail(url=target_thumb)
-
     msg = await interaction.followup.send(embed=embed, ephemeral=False)
 
-    found_servers = []
-    headers = {"User-Agent": "DiscordBot/1.0"}
+    while True:
+        url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
+        if cursor:
+            url += f"&cursor={cursor}"
 
-    semaphore = asyncio.Semaphore(10)
+        r = requests.get(url, headers=headers)
+        data = r.json()
+        servers = data.get("data", [])
+        if not servers:
+            break
 
-    async def check_server(server):
-        async with semaphore:
-            tokens = [
-                {"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": server["id"]}
-                for t in server.get("playerTokens", [])
-            ]
-
+        updated = False
+        for s in servers:
+            tokens = [{"token": t, "type": "AvatarHeadshot", "size": "150x150", "requestId": s["id"]} for t in s.get("playerTokens", [])]
             if not tokens:
-                return None
-
-            async with session.post(
+                continue
+            thumb_data = requests.post(
                 "https://thumbnails.roblox.com/v1/batch",
+                headers={"Content-Type": "application/json"},
                 json=tokens
-            ) as r:
+            ).json()
+            for t in thumb_data.get("data", []):
+                if t.get("imageUrl") == target_thumb and s["id"] not in found_servers:
+                    found_servers.append(s["id"])
+                    updated = True
 
-                data = await r.json()
+        if updated:
+            desc = f"Game: {game_name}\nPlace ID: {place_id}\nFound in servers:\n"
+            for sid in found_servers:
+                desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={sid})\n"
+            embed.description = desc
+            await msg.edit(embed=embed)
 
-            for t in data.get("data", []):
-               if t.get("imageUrl") == target_thumb:
-                  return server["id"]
-
-        return None
-
-    for _ in range(10):
-        cursor = ""
-        while True:
-            url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
-            if cursor:
-                url += f"&cursor={cursor}"
-
-            async with session.get(url, headers=headers) as r:
-                data = await r.json()
-
-            servers = data.get("data", [])
-
-            if not servers:
-                break
-
-            tasks = [check_server(s) for s in servers]
-            results = await asyncio.gather(*tasks)
-
-            for server_id in results:
-                if server_id and server_id not in found_servers:
-                    found_servers.append(server_id)
-
-            if found_servers:
-                desc = f"Game: {game_name}\nPlace ID: {place_id}\nFound in servers:\n"
-
-                for sid in found_servers:
-                    desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={sid})\n"
-                embed.description = desc
-                await msg.edit(embed=embed)
-                return
-
-            cursor = data.get("nextPageCursor")
-
-            if not cursor:
-                break
-
-        await asyncio.sleep(2)
+        cursor = data.get("nextPageCursor")
+        if not cursor:
+            break
+        await asyncio.sleep(1.5)
 
     if not found_servers:
         embed.description = f"Game: {game_name}\nPlace ID: {place_id}\n❌ Target not found in currently listed servers."
