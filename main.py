@@ -179,8 +179,8 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
                 data = await r.json()
 
             for t in data.get("data", []):
-                if target_thumb in t.get("imageUrl", ""):
-                    return server["id"]
+               if t.get("imageUrl") == target_thumb:
+                  return server["id"]
 
         return None
 
