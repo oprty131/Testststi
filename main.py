@@ -157,7 +157,6 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
     msg = await interaction.followup.send(embed=embed, ephemeral=False)
 
     found_servers = []
-    cursor = ""
     headers = {"User-Agent": "DiscordBot/1.0"}
 
     semaphore = asyncio.Semaphore(10)
@@ -185,39 +184,43 @@ async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
 
         return None
 
-    while True:
-        url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
-        if cursor:
-            url += f"&cursor={cursor}"
+    for _ in range(10):
+        cursor = ""
+        while True:
+            url = f"https://games.roblox.com/v1/games/{place_id}/servers/Public?limit=100"
+            if cursor:
+                url += f"&cursor={cursor}"
 
-        async with session.get(url, headers=headers) as r:
-            data = await r.json()
+            async with session.get(url, headers=headers) as r:
+                data = await r.json()
 
-        servers = data.get("data", [])
+            servers = data.get("data", [])
 
-        if not servers:
-            break
+            if not servers:
+                break
 
-        tasks = [check_server(s) for s in servers]
-        results = await asyncio.gather(*tasks)
+            tasks = [check_server(s) for s in servers]
+            results = await asyncio.gather(*tasks)
 
-        for server_id in results:
-            if server_id and server_id not in found_servers:
-                found_servers.append(server_id)
+            for server_id in results:
+                if server_id and server_id not in found_servers:
+                    found_servers.append(server_id)
 
-        if found_servers:
-            desc = f"Game: {game_name}\nPlace ID: {place_id}\nFound in servers:\n"
+            if found_servers:
+                desc = f"Game: {game_name}\nPlace ID: {place_id}\nFound in servers:\n"
 
-            for sid in found_servers:
-                desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={sid})\n"
-            embed.description = desc
-            await msg.edit(embed=embed)
+                for sid in found_servers:
+                    desc += f"Join: [Click Here To Join](https://peeky.pythonanywhere.com/join?placeId={place_id}&gameInstanceId={sid})\n"
+                embed.description = desc
+                await msg.edit(embed=embed)
+                return
 
-        cursor = data.get("nextPageCursor")
+            cursor = data.get("nextPageCursor")
 
-        if not cursor:
-            break
-        await asyncio.sleep(0.5)
+            if not cursor:
+                break
+
+        await asyncio.sleep(2)
 
     if not found_servers:
         embed.description = f"Game: {game_name}\nPlace ID: {place_id}\n❌ Target not found in currently listed servers."
