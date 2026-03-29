@@ -100,16 +100,35 @@ class KokoButtonView(discord.ui.View):
         for _ in range(self.count):
             await interaction.followup.send(self.message)
 
+playwright = None
+browser = None
+
 @bot.event
 async def on_ready():
     global session
     session = aiohttp.ClientSession()
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch(
+        headless=True,
+        args=[
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process',
+        ],
+        chromium_sandbox=False
+    )    
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 async def on_close():
     if session:
         await session.close()
-
+    if browser:
+        await browser.close()
+    if playwright:
+        await playwright.stop()
+        
 @bot.tree.command(name="fakemessage", description="Generate a realistic Discord message")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
@@ -187,26 +206,13 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     </body>
     </html>"""
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--single-process',
-            ],
-            chromium_sandbox=False
-        )
+    page = await browser.new_page()
+    await page.set_content(html_content)
 
-        page = await browser.new_page()
-        await page.set_content(html_content)
+    element = await page.query_selector('.container')
+    image = await element.screenshot()
 
-        element = await page.query_selector('.container')
-        image = await element.screenshot()
-
-        await browser.close()
+    await page.close()
 
     file = discord.File(fp=bytes(image), filename="discord_message.png")
     await interaction.followup.send(file=file)
