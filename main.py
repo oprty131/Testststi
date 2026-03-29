@@ -140,6 +140,7 @@ async def on_ready():
     timestamp="Optional timestamp (e.g. Today at 8:49 AM)"
 )
 async def fakemessage(interaction: discord.Interaction, user: discord.User, text: str, timestamp: str = None):
+    global browser, playwright    
     await interaction.response.defer()
 
     avatar = user.display_avatar.replace(size=128).url
