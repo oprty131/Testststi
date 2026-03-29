@@ -223,10 +223,10 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     await page.close()
 
     file = discord.File(fp=io.BytesIO(image), filename="discord_message.png")
-  try:
-    await interaction.followup.send(file=file)
-  except Exception as e:
-    await interaction.followup.send(f"Error: {e}")
+    try:
+        await interaction.followup.send(file=file)
+    except Exception as e:
+        await interaction.followup.send(f"Error: {e}")
     
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
 @app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
