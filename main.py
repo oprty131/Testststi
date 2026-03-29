@@ -5,6 +5,7 @@ import aiohttp
 import asyncio
 import time
 import html
+import io
 from discord.ext import commands
 from discord import app_commands
 from playwright.async_api import async_playwright
@@ -146,7 +147,6 @@ async def on_close():
     timestamp="Optional timestamp (e.g. Today at 8:49 AM)"
 )
 async def fakemessage(interaction: discord.Interaction, user: discord.User, text: str, timestamp: str = None):
-
     await interaction.response.defer()
 
     avatar = user.display_avatar.replace(size=128).url
@@ -222,9 +222,12 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
 
     await page.close()
 
-    file = discord.File(fp=bytes(image), filename="discord_message.png")
+    file = discord.File(fp=io.BytesIO(image), filename="discord_message.png")
+  try:
     await interaction.followup.send(file=file)
-
+  except Exception as e:
+    await interaction.followup.send(f"Error: {e}")
+    
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
 @app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
