@@ -105,20 +105,28 @@ browser = None
 
 @bot.event
 async def on_ready():
-    global session
+    global session, playwright, browser
     session = aiohttp.ClientSession()
-    playwright = await async_playwright().start()
-    browser = await playwright.chromium.launch(
-        headless=True,
-        args=[
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--single-process',
-        ],
-        chromium_sandbox=False
-    )    
+
+    try:
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--single-process',
+            ],
+            chromium_sandbox=False
+        )
+        print("✅ Browser started successfully")
+
+    except Exception as e:
+        browser = None
+        print("❌ Browser failed to start:", e)
+
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
 async def on_close():
