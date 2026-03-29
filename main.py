@@ -159,8 +159,8 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     }}
 
     .username {{ color: #fff; font-size: 16px; font-weight: 500; }}
-    .timestamp {{ color: #949ba4; font-size: 12px; }}
-    .text {{ color: #dbdee1; font-size: 16px; }}
+    .timestamp {{ color: #949ba4; font-size: 12px; margin-left: 6px; }}
+    .text {{ color: #dbdee1; font-size: 16px; margin-top: 2px; }}
 
     .mention {{
         background: rgba(88,101,242,0.3);
@@ -176,8 +176,10 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
             <div class="message">
                 <img class="avatar" src="{avatar}">
                 <div>
-                    <span class="username">{username}</span>
-                    <span class="timestamp">{timestamp}</span>
+                    <div>
+                        <span class="username">{username}</span>
+                        <span class="timestamp">{timestamp}</span>
+                    </div>
                     <div class="text">{safe_text}</div>
                 </div>
             </div>
@@ -185,25 +187,27 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     </body>
     </html>"""
 
-async with async_playwright() as p:
-    browser = await p.chromium.launch(
-        headless=True,
-        args=[
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--single-process',
-        ],
-        chromium_sandbox=False  # important for containers
-    )
-    page = await browser.new_page()
-    await page.set_content(html_content)
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--single-process',
+            ],
+            chromium_sandbox=False
+        )
 
-    element = await page.query_selector('.container')
-    image = await element.screenshot()
-    await browser.close()
-    
+        page = await browser.new_page()
+        await page.set_content(html_content)
+
+        element = await page.query_selector('.container')
+        image = await element.screenshot()
+
+        await browser.close()
+
     file = discord.File(fp=bytes(image), filename="discord_message.png")
     await interaction.followup.send(file=file)
 
