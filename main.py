@@ -185,18 +185,25 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     </body>
     </html>"""
 
-    # ✅ PLAYWRIGHT (correct usage)
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(args=['--no-sandbox'])
-        page = await browser.new_page()
+async with async_playwright() as p:
+    browser = await p.chromium.launch(
+        headless=True,
+        args=[
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process',
+        ],
+        chromium_sandbox=False  # important for containers
+    )
+    page = await browser.new_page()
+    await page.set_content(html_content)
 
-        await page.set_content(html_content)
-
-        element = await page.query_selector('.container')
-        image = await element.screenshot()
-
-        await browser.close()
-
+    element = await page.query_selector('.container')
+    image = await element.screenshot()
+    await browser.close()
+    
     file = discord.File(fp=bytes(image), filename="discord_message.png")
     await interaction.followup.send(file=file)
 
