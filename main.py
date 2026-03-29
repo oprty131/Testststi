@@ -215,26 +215,26 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     </html>"""
 
     try:
-      page = await browser.new_page()
+        page = await browser.new_page()
     except:
-     global playwright, browser
-     playwright = await async_playwright().start()
-     browser = await playwright.chromium.launch(
-          headless=True,
-          args=[
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-gpu',
-              '--single-process',
-          ],
-          chromium_sandbox=False
-    )
-    page = await browser.new_page()
-    
+        global playwright, browser
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--single-process",
+            ],
+            chromium_sandbox=False
+        )
+        page = await browser.new_page()
+
     await page.set_content(html_content)
 
-    element = await page.query_selector('.container')
+    element = await page.query_selector(".container")
     image = await element.screenshot()
 
     await page.close()
