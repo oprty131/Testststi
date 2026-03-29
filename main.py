@@ -100,7 +100,7 @@ class KokoButtonView(discord.ui.View):
 
         for _ in range(self.count):
             await interaction.followup.send(self.message)
-
+            
 playwright = None
 browser = None
 
@@ -130,14 +130,7 @@ async def on_ready():
 
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
-async def on_close():
-    if session:
-        await session.close()
-    if browser:
-        await browser.close()
-    if playwright:
-        await playwright.stop()
-        
+    
 @bot.tree.command(name="fakemessage", description="Generate a realistic Discord message")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
@@ -214,10 +207,13 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     </body>
     </html>"""
 
+    if browser is None:
+        await interaction.followup.send("Browser not available.")
+        return
+
     try:
         page = await browser.new_page()
     except:
-        global playwright, browser
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(
             headless=True,
