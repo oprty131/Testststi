@@ -107,6 +107,150 @@ async def on_close():
     if session:
         await session.close()
 
+import discord
+from discord import app_commands
+from discord.ext import commands
+from pyppeteer import launch
+from datetime import datetime
+import html
+
+intents = discord.Intents.default()
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Logged in as {bot.user}")
+
+@bot.tree.command(name="fakemessage", description="Generate a realistic Discord message")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+@app_commands.describe(
+    user="User to fake",
+    text="Message content",
+    timestamp="Optional timestamp (e.g. Today at 8:49 AM)"
+)
+async def fakemessage(interaction: discord.Interaction, user: discord.User, text: str, timestamp: str = None):
+    await interaction.response.defer()
+
+    avatar = user.display_avatar.replace(size=128).url
+    username = html.escape(user.display_name)
+
+    if not timestamp:
+        timestamp = datetime.now().strftime("%I:%M %p").lstrip("0")
+
+    safe_text = html.escape(text).replace(
+        "@", '<span class="mention">@</span>'
+    ).replace("\n", "<br>")
+
+    html_content = f"""
+    <html>
+    <head>
+    <style>
+    body {{
+        margin: 0;
+        background: #36393f;
+        font-family: "gg sans", "Whitney", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }}
+
+    .container {{
+        padding: 20px;
+    }}
+
+    .message {{
+        display: flex;
+        position: relative;
+        padding: 2px 16px 2px 72px;
+        min-height: 48px;
+    }}
+
+    .avatar {{
+        position: absolute;
+        left: 16px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+    }}
+
+    .content {{
+        display: flex;
+        flex-direction: column;
+    }}
+
+    .header {{
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+    }}
+
+    .username {{
+        font-size: 16px;
+        font-weight: 500;
+        color: #ffffff;
+    }}
+
+    .timestamp {{
+        font-size: 12px;
+        color: #949ba4;
+    }}
+
+    .text {{
+        font-size: 16px;
+        color: #dbdee1;
+        line-height: 1.375rem;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }}
+
+    .mention {{
+        background: rgba(88,101,242,0.3);
+        color: #c9cdfb;
+        padding: 0 2px;
+        border-radius: 3px;
+    }}
+
+    </style>
+    </head>
+
+    <body>
+        <div class="container">
+            <div class="message">
+                <img class="avatar" src="{avatar}">
+                <div class="content">
+                    <div class="header">
+                        <span class="username">{username}</span>
+                        <span class="timestamp">{timestamp}</span>
+                    </div>
+                    <div class="text">{safe_text}</div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    browser = await launch(
+    headless=True,
+    args=[
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+    ]
+)
+    page = await browser.newPage()
+
+    await page.setViewport({"width": 800, "height": 200})
+    await page.setContent(html_content)
+
+    element = await page.querySelector('.container')
+    image = await element.screenshot()
+
+    await browser.close()
+
+    file = discord.File(fp=bytes(image), filename="discord_message.png")
+    await interaction.followup.send(file=file)
+
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
 @app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
