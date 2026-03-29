@@ -216,13 +216,18 @@ async def fakemessage(interaction: discord.Interaction, user: discord.User, text
     </body>
     </html>
     """
-
-    browser = await launch(
+    
+browser = await launch(
     headless=True,
+    handleSIGINT=False,
+    handleSIGTERM=False,
+    handleSIGHUP=False,
     args=[
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-zygote',
         '--single-process'
     ]
 )
