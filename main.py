@@ -8,7 +8,6 @@ import html
 import io
 from discord.ext import commands
 from discord import app_commands
-from playwright.async_api import async_playwright
 from datetime import datetime
 from flask import Flask
 from dotenv import load_dotenv
@@ -101,147 +100,13 @@ class KokoButtonView(discord.ui.View):
         for _ in range(self.count):
             await interaction.followup.send(self.message)
             
-playwright = None
-browser = None
-
 @bot.event
 async def on_ready():
-    global session, playwright, browser
+    global session
     session = aiohttp.ClientSession()
-
-    try:
-        playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(
-            headless=True,
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--single-process',
-            ],
-            chromium_sandbox=False
-        )
-        print("✅ Browser started successfully")
-
-    except Exception as e:
-        browser = None
-        print("❌ Browser failed to start:", e)
-
     await bot.tree.sync()
     print(f"Bot is online as {bot.user}")
-    
-@bot.tree.command(name="fakemessage", description="Generate a realistic Discord message")
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-@app_commands.describe(
-    user="User to fake",
-    text="Message content",
-    timestamp="Optional timestamp (e.g. Today at 8:49 AM)"
-)
-async def fakemessage(interaction: discord.Interaction, user: discord.User, text: str, timestamp: str = None):
-    global browser, playwright    
-    await interaction.response.defer()
-
-    avatar = user.display_avatar.replace(size=128).url
-    username = html.escape(user.display_name)
-
-    if not timestamp:
-        timestamp = datetime.now().strftime("%I:%M %p").lstrip("0")
-
-    safe_text = html.escape(text).replace(
-        "@", '<span class="mention">@</span>'
-    ).replace("\n", "<br>")
-
-    html_content = f"""<html>
-    <head>
-    <style>
-    body {{
-        margin: 0;
-        background: #36393f;
-        font-family: "gg sans", "Whitney", Arial;
-    }}
-
-    .container {{ padding: 20px; }}
-
-    .message {{
-        display: flex;
-        position: relative;
-        padding: 2px 16px 2px 72px;
-        min-height: 48px;
-    }}
-
-    .avatar {{
-        position: absolute;
-        left: 16px;
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-    }}
-
-    .username {{ color: #fff; font-size: 16px; font-weight: 500; }}
-    .timestamp {{ color: #949ba4; font-size: 12px; margin-left: 6px; }}
-    .text {{ color: #dbdee1; font-size: 16px; margin-top: 2px; }}
-
-    .mention {{
-        background: rgba(88,101,242,0.3);
-        color: #c9cdfb;
-        padding: 0 2px;
-        border-radius: 3px;
-    }}
-    </style>
-    </head>
-
-    <body>
-        <div class="container">
-            <div class="message">
-                <img class="avatar" src="{avatar}">
-                <div>
-                    <div>
-                        <span class="username">{username}</span>
-                        <span class="timestamp">{timestamp}</span>
-                    </div>
-                    <div class="text">{safe_text}</div>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>"""
-
-    if browser is None:
-        await interaction.followup.send("Browser not available.")
-        return
-
-    try:
-        page = await browser.new_page()
-    except:
-        playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--single-process",
-            ],
-            chromium_sandbox=False
-        )
-        page = await browser.new_page()
-
-    await page.set_content(html_content)
-
-    element = await page.query_selector(".container")
-    image = await element.screenshot()
-
-    await page.close()
-
-    file = discord.File(fp=io.BytesIO(image), filename="discord_message.png")
-    try:
-        await interaction.followup.send(file=file)
-    except Exception as e:
-        await interaction.followup.send(f"Error: {e}")
-    
+        
 @bot.tree.command(name="snipe", description="Stream Snipe Someone")
 @app_commands.describe(user_id="Target Roblox User ID", place_id="Roblox game Place ID")
 async def snipe(interaction: discord.Interaction, user_id: int, place_id: int):
